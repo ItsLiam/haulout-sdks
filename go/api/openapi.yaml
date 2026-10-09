@@ -1,0 +1,556 @@
+openapi: 3.0.3
+info:
+  description: Direct PostgREST RPC contract for Haulout product integrations. The
+    product integration key is supplied as p_product_key in each RPC body. The apikey
+    header uses Haulout's Supabase publishable key; it is not the product key.
+  title: Haulout Provider RPC API
+  version: 1.0.0
+servers:
+- url: https://qszqptdtmkppelqligvb.supabase.co/rest/v1
+security:
+- HauloutServiceKey: []
+paths:
+  /rpc/write_definition_by_key:
+    post:
+      description: Replaces the complete HSP ProductDefinition only when the current
+        definition revision equals p_expected_revision. On success the revision increments
+        by one. Definition payloads are limited to 1 MiB. The returned hash is sha256:<lowercase
+        hex>. No argument has a SQL default.
+      operationId: writeDefinitionByKey
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/writeDefinitionByKey_request"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: "#/components/schemas/writeDefinitionByKey_200_response_inner"
+                type: array
+          description: PostgREST table result (one returned row).
+        default:
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PostgrestError"
+          description: PostgREST error. SQLSTATE 22023 means an invalid ProductDefinition;
+            28000 means invalid product key; PT409 means definition revision conflict.
+            HTTP status translation is performed by PostgREST.
+      summary: Compare-and-swap a product definition
+  /rpc/write_state_by_key:
+    post:
+      description: "Writes the complete state values object after validating declared\
+        \ HSP state fields. An identical existing value is returned without changing\
+        \ its revision, even if the supplied expected revision is stale. Empty initial\
+        \ state has revision zero; its first successful write produces revision one.\
+        \ Payload is limited to 1 MiB. No argument has a SQL default."
+      operationId: writeStateByKey
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/writeStateByKey_request"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: "#/components/schemas/writeStateByKey_200_response_inner"
+                type: array
+          description: PostgREST table result (one returned row).
+        default:
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PostgrestError"
+          description: PostgREST error. SQLSTATE 22023 means a missing/invalid revision
+            or invalid/undeclared state values; 28000 means invalid product key; PT409
+            means state revision conflict.
+      summary: Compare-and-swap product state
+  /rpc/publish_event_batch_by_key:
+    post:
+      description: "Requires the active definition revision. Accepts 1–100 events;\
+        \ the encoded batch and each event fields object are limited to 131072 bytes.\
+        \ The product-scoped idempotency receipt is valid for 24 hours. Reusing an\
+        \ event ID with identical source, revision, timestamp and fields counts as\
+        \ a duplicate; changed content conflicts. No argument has a SQL default."
+      operationId: publishEventBatchByKey
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/publishEventBatchByKey_request"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/publishEventBatchByKey_200_response"
+          description: Direct JSON RPC result.
+        default:
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PostgrestError"
+          description: PostgREST error. SQLSTATE 22023 means invalid batch/event/source
+            or event fields; 28000 means invalid product key; PT409 means definition
+            revision conflict; 23505 means idempotency key conflict or event ID reused
+            with different content.
+      summary: Publish an idempotent event batch
+  /rpc/claim_command_by_key:
+    post:
+      description: Claims the first eligible accepted command with a 45-second lease.
+        Expired accepted commands become expired; expired running commands become
+        unknown and are not silently rerun. A repeated claim UUID for the same worker
+        returns the same claim; using it for another worker conflicts. HTTP 200 with
+        JSON null means there is no eligible work. No argument has a SQL default.
+      operationId: claimCommandByKey
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/claimCommandByKey_request"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: "#/components/schemas/CommandClaim"
+                nullable: true
+          description: "Claimed command object, or JSON null when no work is eligible."
+        default:
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PostgrestError"
+          description: PostgREST error. SQLSTATE 22023 means invalid worker/claim
+            arguments; 28000 means invalid product key; 23505 means claim ID conflict.
+      summary: Claim the next eligible command
+  /rpc/complete_command_by_key:
+    post:
+      description: "Reports succeeded, failed or rejected. Result is arbitrary JSON\
+        \ including scalar, array and null values, and is limited to 131072 bytes.\
+        \ Completion at or after lease expiry records/returns unknown with null result.\
+        \ Repeating the same lease/status/result is idempotent; changed content conflicts.\
+        \ No argument has a SQL default."
+      operationId: completeCommandByKey
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/completeCommandByKey_request"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CompletionStatus"
+          description: Completed status returned directly as a JSON string.
+        default:
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PostgrestError"
+          description: PostgREST error. SQLSTATE 22023 means invalid status/result;
+            28000 means invalid product key; 42501 means inactive product; 23505 means
+            command result conflict; P0002 means command lease not found.
+      summary: Complete a leased command
+components:
+  schemas:
+    ProductKey:
+      description: The product's current integration key (hk_<test|live>.<product
+        UUID>.<base64url secret>). Supplied only in p_product_key; rotation invalidates
+        the old key immediately.
+      type: string
+    ProductDefinition:
+      description: HSP ProductDefinition v2.0. SQL is authoritative for recursive
+        dashboard and component validation; this DTO keeps dashboard contents as opaque
+        JSON.
+      properties:
+        type:
+          enum:
+          - ProductDefinition
+          type: string
+        version:
+          enum:
+          - "2.0"
+          type: string
+        streams:
+          additionalProperties:
+            $ref: "#/components/schemas/Stream"
+          description: Map of declared stream names to HSP stream descriptions.
+          type: object
+        state:
+          additionalProperties:
+            $ref: "#/components/schemas/Field"
+          description: Map of declared state paths to field declarations.
+          type: object
+        commands:
+          additionalProperties:
+            $ref: "#/components/schemas/Command"
+          description: Map of declared command names to command declarations.
+          type: object
+        dashboards:
+          description: Ordered dashboard descriptors. Their recursively validated
+            HSP 2.0 structures are transported as opaque JSON by this generated DTO.
+          items:
+            $ref: "#/components/schemas/Dashboard"
+          type: array
+      required:
+      - commands
+      - dashboards
+      - state
+      - streams
+      - type
+      - version
+      type: object
+    Dashboard:
+      additionalProperties: true
+      description: "Opaque HSP 2.0 dashboard JSON. SQL validates dashboard fields,\
+        \ nonrecursive Surface and SurfaceGroup components, metrics, actions, declarations,\
+        \ references, limits, and defaults authoritatively."
+      type: object
+    Field:
+      description: HSP field declaration; SQL performs authoritative validation.
+      properties:
+        type:
+          enum:
+          - number
+          - integer
+          - string
+          - boolean
+          type: string
+        required:
+          type: boolean
+        unit:
+          type: string
+        minimum:
+          format: double
+          type: number
+        maximum:
+          format: double
+          type: number
+        maxLength:
+          maximum: 4096
+          minimum: 1
+          type: integer
+        enum:
+          items: {}
+          type: array
+      required:
+      - type
+      type: object
+    Stream:
+      properties:
+        kind:
+          enum:
+          - timeseries
+          - events
+          - latest
+          type: string
+        fields:
+          additionalProperties:
+            $ref: "#/components/schemas/Field"
+          type: object
+        description:
+          type: string
+      required:
+      - fields
+      - kind
+      type: object
+    Command:
+      properties:
+        title:
+          type: string
+        danger:
+          enum:
+          - normal
+          - destructive
+          type: string
+        arguments:
+          additionalProperties:
+            $ref: "#/components/schemas/Field"
+          type: object
+        timeoutSeconds:
+          maximum: 30
+          minimum: 1
+          type: integer
+      required:
+      - arguments
+      - danger
+      - title
+      type: object
+    Surface:
+      additionalProperties: true
+      description: HSP surface descriptor. Its recursive node and action structures
+        are accepted as JSON here; the database validates them against HSP v1.0 and
+        retains its supported unknown-node fallback behavior.
+      type: object
+    CommandClaim:
+      properties:
+        commandId:
+          format: uuid
+          type: string
+        command:
+          type: string
+        arguments:
+          additionalProperties: true
+          type: object
+        definitionRevision:
+          format: int64
+          type: integer
+        leaseId:
+          format: uuid
+          type: string
+        leaseExpiresAt:
+          format: date-time
+          type: string
+      required:
+      - arguments
+      - command
+      - commandId
+      - definitionRevision
+      - leaseExpiresAt
+      - leaseId
+      type: object
+    CompletionStatus:
+      enum:
+      - succeeded
+      - failed
+      - rejected
+      - unknown
+      type: string
+    PostgrestError:
+      description: PostgREST JSON error body; SQLSTATE is in code and text in message.
+      example:
+        code: code
+        message: message
+        details: details
+        hint: hint
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        details:
+          nullable: true
+          type: string
+        hint:
+          nullable: true
+          type: string
+      required:
+      - code
+      - message
+      type: object
+    writeDefinitionByKey_request:
+      properties:
+        p_product_key:
+          description: The product's current integration key (hk_<test|live>.<product
+            UUID>.<base64url secret>). Supplied only in p_product_key; rotation invalidates
+            the old key immediately.
+          type: string
+        p_expected_revision:
+          format: int64
+          minimum: 0
+          type: integer
+        p_definition:
+          $ref: "#/components/schemas/ProductDefinition"
+      required:
+      - p_definition
+      - p_expected_revision
+      - p_product_key
+      type: object
+    writeDefinitionByKey_200_response_inner:
+      example:
+        revision: 0
+        hash: hash
+      properties:
+        revision:
+          format: int64
+          type: integer
+        hash:
+          pattern: "^sha256:[0-9a-f]{64}$"
+          type: string
+      required:
+      - hash
+      - revision
+      type: object
+    writeStateByKey_request:
+      properties:
+        p_product_key:
+          description: The product's current integration key (hk_<test|live>.<product
+            UUID>.<base64url secret>). Supplied only in p_product_key; rotation invalidates
+            the old key immediately.
+          type: string
+        p_expected_revision:
+          format: int64
+          minimum: 0
+          type: integer
+        p_values:
+          additionalProperties: true
+          description: Bounded values object; properties and their values are validated
+            against declared HSP state fields. Values may be nested objects where
+            the declaration uses dotted paths.
+          type: object
+      required:
+      - p_expected_revision
+      - p_product_key
+      - p_values
+      type: object
+    writeStateByKey_200_response_inner:
+      example:
+        revision: 0
+        values:
+          key: ""
+      properties:
+        revision:
+          format: int64
+          type: integer
+        values:
+          additionalProperties: true
+          type: object
+      required:
+      - revision
+      - values
+      type: object
+    publishEventBatchByKey_request_p_events_inner:
+      properties:
+        id:
+          type: string
+        source:
+          type: string
+        time:
+          description: Timestamp accepted by PostgreSQL timestamptz input.
+          type: string
+        fields:
+          additionalProperties: true
+          description: Fields validated against the selected stream declaration; values
+            preserve arbitrary JSON.
+          type: object
+      required:
+      - fields
+      - id
+      - source
+      - time
+      type: object
+    publishEventBatchByKey_request:
+      properties:
+        p_product_key:
+          description: The product's current integration key (hk_<test|live>.<product
+            UUID>.<base64url secret>). Supplied only in p_product_key; rotation invalidates
+            the old key immediately.
+          type: string
+        p_idempotency_key:
+          format: uuid
+          type: string
+        p_definition_revision:
+          format: int64
+          minimum: 0
+          type: integer
+        p_events:
+          items:
+            $ref: "#/components/schemas/publishEventBatchByKey_request_p_events_inner"
+          maxItems: 100
+          minItems: 1
+          type: array
+      required:
+      - p_definition_revision
+      - p_events
+      - p_idempotency_key
+      - p_product_key
+      type: object
+    publishEventBatchByKey_200_response:
+      example:
+        accepted: 0
+        duplicates: 0
+        cursor: cursor
+        committedAt: 2000-01-23T04:56:07.000+00:00
+        dedupeUntil: 2000-01-23T04:56:07.000+00:00
+      properties:
+        accepted:
+          minimum: 0
+          type: integer
+        duplicates:
+          minimum: 0
+          type: integer
+        cursor:
+          description: Cursor encoded as a decimal string.
+          type: string
+        committedAt:
+          format: date-time
+          type: string
+        dedupeUntil:
+          format: date-time
+          type: string
+      required:
+      - accepted
+      - committedAt
+      - cursor
+      - dedupeUntil
+      - duplicates
+      type: object
+    claimCommandByKey_request:
+      properties:
+        p_product_key:
+          description: The product's current integration key (hk_<test|live>.<product
+            UUID>.<base64url secret>). Supplied only in p_product_key; rotation invalidates
+            the old key immediately.
+          type: string
+        p_worker_id:
+          maxLength: 128
+          minLength: 1
+          type: string
+        p_claim_id:
+          format: uuid
+          type: string
+      required:
+      - p_claim_id
+      - p_product_key
+      - p_worker_id
+      type: object
+    completeCommandByKey_request:
+      properties:
+        p_product_key:
+          description: The product's current integration key (hk_<test|live>.<product
+            UUID>.<base64url secret>). Supplied only in p_product_key; rotation invalidates
+            the old key immediately.
+          type: string
+        p_command_id:
+          format: uuid
+          type: string
+        p_lease_id:
+          format: uuid
+          type: string
+        p_status:
+          enum:
+          - succeeded
+          - failed
+          - rejected
+          type: string
+        p_result:
+          description: "Arbitrary JSON result value, including null."
+          nullable: true
+      required:
+      - p_command_id
+      - p_lease_id
+      - p_product_key
+      - p_result
+      - p_status
+      type: object
+  securitySchemes:
+    HauloutServiceKey:
+      description: "Haulout service publishable key, not the product integration key."
+      in: header
+      name: apikey
+      type: apiKey
+      x-haulout-service-key: sb_publishable_hV_aFsYqfTC90-M6pfXzjg_woQxAscg

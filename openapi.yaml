@@ -1,0 +1,387 @@
+openapi: 3.0.3
+info:
+  title: Haulout Provider RPC API
+  version: 1.0.0
+  description: >-
+    Direct PostgREST RPC contract for Haulout product integrations. The product
+    integration key is supplied as p_product_key in each RPC body. The apikey
+    header uses Haulout's Supabase publishable key; it is not the product key.
+servers:
+  - url: https://qszqptdtmkppelqligvb.supabase.co/rest/v1
+security:
+  - HauloutServiceKey: []
+paths:
+  /rpc/write_definition_by_key:
+    post:
+      operationId: writeDefinitionByKey
+      summary: Compare-and-swap a product definition
+      description: >-
+        Replaces the complete HSP ProductDefinition only when the current
+        definition revision equals p_expected_revision. On success the revision
+        increments by one. Definition payloads are limited to 1 MiB. The returned
+        hash is sha256:<lowercase hex>. No argument has a SQL default.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [p_product_key, p_expected_revision, p_definition]
+              properties:
+                p_product_key:
+                  $ref: '#/components/schemas/ProductKey'
+                p_expected_revision:
+                  type: integer
+                  format: int64
+                  minimum: 0
+                p_definition:
+                  $ref: '#/components/schemas/ProductDefinition'
+      responses:
+        '200':
+          description: PostgREST table result (one returned row).
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  required: [revision, hash]
+                  properties:
+                    revision: {type: integer, format: int64}
+                    hash: {type: string, pattern: '^sha256:[0-9a-f]{64}$'}
+        default:
+          description: >-
+            PostgREST error. SQLSTATE 22023 means an invalid ProductDefinition;
+            28000 means invalid product key; PT409 means definition revision
+            conflict. HTTP status translation is performed by PostgREST.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PostgrestError'
+  /rpc/write_state_by_key:
+    post:
+      operationId: writeStateByKey
+      summary: Compare-and-swap product state
+      description: >-
+        Writes the complete state values object after validating declared HSP
+        state fields. An identical existing value is returned without changing
+        its revision, even if the supplied expected revision is stale. Empty
+        initial state has revision zero; its first successful write produces
+        revision one. Payload is limited to 1 MiB. No argument has a SQL default.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [p_product_key, p_expected_revision, p_values]
+              properties:
+                p_product_key:
+                  $ref: '#/components/schemas/ProductKey'
+                p_expected_revision:
+                  type: integer
+                  format: int64
+                  minimum: 0
+                p_values:
+                  type: object
+                  description: >-
+                    Bounded values object; properties and their values are
+                    validated against declared HSP state fields. Values may be
+                    nested objects where the declaration uses dotted paths.
+                  additionalProperties: true
+      responses:
+        '200':
+          description: PostgREST table result (one returned row).
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  required: [revision, values]
+                  properties:
+                    revision: {type: integer, format: int64}
+                    values:
+                      type: object
+                      additionalProperties: true
+        default:
+          description: >-
+            PostgREST error. SQLSTATE 22023 means a missing/invalid revision or
+            invalid/undeclared state values; 28000 means invalid product key;
+            PT409 means state revision conflict.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PostgrestError'
+  /rpc/publish_event_batch_by_key:
+    post:
+      operationId: publishEventBatchByKey
+      summary: Publish an idempotent event batch
+      description: >-
+        Requires the active definition revision. Accepts 1–100 events; the
+        encoded batch and each event fields object are limited to 131072 bytes.
+        The product-scoped idempotency receipt is valid for 24 hours. Reusing an
+        event ID with identical source, revision, timestamp and fields counts as
+        a duplicate; changed content conflicts. No argument has a SQL default.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [p_product_key, p_idempotency_key, p_definition_revision, p_events]
+              properties:
+                p_product_key:
+                  $ref: '#/components/schemas/ProductKey'
+                p_idempotency_key:
+                  type: string
+                  format: uuid
+                p_definition_revision:
+                  type: integer
+                  format: int64
+                  minimum: 0
+                p_events:
+                  type: array
+                  minItems: 1
+                  maxItems: 100
+                  items:
+                    type: object
+                    required: [id, source, time, fields]
+                    properties:
+                      id: {type: string}
+                      source: {type: string}
+                      time:
+                        type: string
+                        description: Timestamp accepted by PostgreSQL timestamptz input.
+                      fields:
+                        type: object
+                        description: Fields validated against the selected stream declaration; values preserve arbitrary JSON.
+                        additionalProperties: true
+      responses:
+        '200':
+          description: Direct JSON RPC result.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [accepted, duplicates, cursor, committedAt, dedupeUntil]
+                properties:
+                  accepted: {type: integer, minimum: 0}
+                  duplicates: {type: integer, minimum: 0}
+                  cursor: {type: string, description: Cursor encoded as a decimal string.}
+                  committedAt: {type: string, format: date-time}
+                  dedupeUntil: {type: string, format: date-time}
+        default:
+          description: >-
+            PostgREST error. SQLSTATE 22023 means invalid batch/event/source or
+            event fields; 28000 means invalid product key; PT409 means definition
+            revision conflict; 23505 means idempotency key conflict or event ID
+            reused with different content.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PostgrestError'
+  /rpc/claim_command_by_key:
+    post:
+      operationId: claimCommandByKey
+      summary: Claim the next eligible command
+      description: >-
+        Claims the first eligible accepted command with a 45-second lease. Expired
+        accepted commands become expired; expired running commands become unknown
+        and are not silently rerun. A repeated claim UUID for the same worker
+        returns the same claim; using it for another worker conflicts. HTTP 200
+        with JSON null means there is no eligible work. No argument has a SQL default.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [p_product_key, p_worker_id, p_claim_id]
+              properties:
+                p_product_key:
+                  $ref: '#/components/schemas/ProductKey'
+                p_worker_id:
+                  type: string
+                  minLength: 1
+                  maxLength: 128
+                p_claim_id:
+                  type: string
+                  format: uuid
+      responses:
+        '200':
+          description: Claimed command object, or JSON null when no work is eligible.
+          content:
+            application/json:
+              schema:
+                nullable: true
+                allOf:
+                  - $ref: '#/components/schemas/CommandClaim'
+        default:
+          description: >-
+            PostgREST error. SQLSTATE 22023 means invalid worker/claim arguments;
+            28000 means invalid product key; 23505 means claim ID conflict.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PostgrestError'
+  /rpc/complete_command_by_key:
+    post:
+      operationId: completeCommandByKey
+      summary: Complete a leased command
+      description: >-
+        Reports succeeded, failed or rejected. Result is arbitrary JSON including
+        scalar, array and null values, and is limited to 131072 bytes. Completion
+        at or after lease expiry records/returns unknown with null result. Repeating
+        the same lease/status/result is idempotent; changed content conflicts. No
+        argument has a SQL default.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [p_product_key, p_command_id, p_lease_id, p_status, p_result]
+              properties:
+                p_product_key:
+                  $ref: '#/components/schemas/ProductKey'
+                p_command_id:
+                  type: string
+                  format: uuid
+                p_lease_id:
+                  type: string
+                  format: uuid
+                p_status:
+                  type: string
+                  enum: [succeeded, failed, rejected]
+                p_result:
+                  description: Arbitrary JSON result value, including null.
+                  nullable: true
+      responses:
+        '200':
+          description: Completed status returned directly as a JSON string.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompletionStatus'
+        default:
+          description: >-
+            PostgREST error. SQLSTATE 22023 means invalid status/result; 28000
+            means invalid product key; 42501 means inactive product; 23505 means
+            command result conflict; P0002 means command lease not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PostgrestError'
+components:
+  securitySchemes:
+    HauloutServiceKey:
+      type: apiKey
+      in: header
+      name: apikey
+      description: Haulout service publishable key, not the product integration key.
+      x-haulout-service-key: sb_publishable_hV_aFsYqfTC90-M6pfXzjg_woQxAscg
+  schemas:
+    ProductKey:
+      type: string
+      description: >-
+        The product's current integration key (hk_<test|live>.<product UUID>.<base64url secret>).
+        Supplied only in p_product_key; rotation invalidates the old key immediately.
+    ProductDefinition:
+      type: object
+      description: >-
+        HSP ProductDefinition v2.0. SQL is authoritative for recursive dashboard
+        and component validation; this DTO keeps dashboard contents as opaque JSON.
+      required: [type, version, streams, state, commands, dashboards]
+      properties:
+        type: {type: string, enum: [ProductDefinition]}
+        version: {type: string, enum: ['2.0']}
+        streams:
+          type: object
+          description: Map of declared stream names to HSP stream descriptions.
+          additionalProperties: {$ref: '#/components/schemas/Stream'}
+        state:
+          type: object
+          description: Map of declared state paths to field declarations.
+          additionalProperties: {$ref: '#/components/schemas/Field'}
+        commands:
+          type: object
+          description: Map of declared command names to command declarations.
+          additionalProperties: {$ref: '#/components/schemas/Command'}
+        dashboards:
+          type: array
+          description: >-
+            Ordered dashboard descriptors. Their recursively validated HSP 2.0
+            structures are transported as opaque JSON by this generated DTO.
+          items: {$ref: '#/components/schemas/Dashboard'}
+    Dashboard:
+      type: object
+      description: >-
+        Opaque HSP 2.0 dashboard JSON. SQL validates dashboard fields,
+        nonrecursive Surface and SurfaceGroup components, metrics, actions,
+        declarations, references, limits, and defaults authoritatively.
+      additionalProperties: true
+    Field:
+      type: object
+      description: HSP field declaration; SQL performs authoritative validation.
+      required: [type]
+      properties:
+        type: {type: string, enum: [number, integer, string, boolean]}
+        required: {type: boolean}
+        unit: {type: string}
+        minimum: {type: number, format: double}
+        maximum: {type: number, format: double}
+        maxLength: {type: integer, minimum: 1, maximum: 4096}
+        enum:
+          type: array
+          items: {}
+    Stream:
+      type: object
+      required: [kind, fields]
+      properties:
+        kind: {type: string, enum: [timeseries, events, latest]}
+        fields:
+          type: object
+          additionalProperties: {$ref: '#/components/schemas/Field'}
+        description: {type: string}
+    Command:
+      type: object
+      required: [title, danger, arguments]
+      properties:
+        title: {type: string}
+        danger: {type: string, enum: [normal, destructive]}
+        arguments:
+          type: object
+          additionalProperties: {$ref: '#/components/schemas/Field'}
+        timeoutSeconds: {type: integer, minimum: 1, maximum: 30}
+    Surface:
+      type: object
+      description: >-
+        HSP surface descriptor. Its recursive node and action structures are
+        accepted as JSON here; the database validates them against HSP v1.0 and
+        retains its supported unknown-node fallback behavior.
+      additionalProperties: true
+    CommandClaim:
+      type: object
+      required: [commandId, command, arguments, definitionRevision, leaseId, leaseExpiresAt]
+      properties:
+        commandId: {type: string, format: uuid}
+        command: {type: string}
+        arguments:
+          type: object
+          additionalProperties: true
+        definitionRevision: {type: integer, format: int64}
+        leaseId: {type: string, format: uuid}
+        leaseExpiresAt: {type: string, format: date-time}
+    CompletionStatus:
+      type: string
+      enum: [succeeded, failed, rejected, unknown]
+    PostgrestError:
+      type: object
+      description: PostgREST JSON error body; SQLSTATE is in code and text in message.
+      required: [code, message]
+      properties:
+        code: {type: string}
+        message: {type: string}
+        details: {type: string, nullable: true}
+        hint: {type: string, nullable: true}
