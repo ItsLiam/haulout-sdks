@@ -3,9 +3,9 @@ info:
   title: Haulout Provider RPC API
   version: 1.0.0
   description: >-
-    Direct PostgREST RPC contract for Haulout product integrations. The product
+    Product integration API for Haulout product integrations. The product
     integration key is supplied as p_product_key in each RPC body. The apikey
-    header uses Haulout's Supabase publishable key; it is not the product key.
+    header uses Haulout's public service key; it is not the product key.
 servers:
   - url: https://qszqptdtmkppelqligvb.supabase.co/rest/v1
 security:
@@ -38,7 +38,7 @@ paths:
                   $ref: '#/components/schemas/ProductDefinition'
       responses:
         '200':
-          description: PostgREST table result (one returned row).
+          description: API result row (one returned row).
           content:
             application/json:
               schema:
@@ -51,9 +51,9 @@ paths:
                     hash: {type: string, pattern: '^sha256:[0-9a-f]{64}$'}
         default:
           description: >-
-            PostgREST error. SQLSTATE 22023 means an invalid ProductDefinition;
+            API error. Code 22023 means an invalid ProductDefinition;
             28000 means invalid product key; PT409 means definition revision
-            conflict. HTTP status translation is performed by PostgREST.
+            conflict. HTTP status translation is performed by the API.
           content:
             application/json:
               schema:
@@ -91,7 +91,7 @@ paths:
                   additionalProperties: true
       responses:
         '200':
-          description: PostgREST table result (one returned row).
+          description: API result row (one returned row).
           content:
             application/json:
               schema:
@@ -106,7 +106,7 @@ paths:
                       additionalProperties: true
         default:
           description: >-
-            PostgREST error. SQLSTATE 22023 means a missing/invalid revision or
+            API error. Code 22023 means a missing/invalid revision or
             invalid/undeclared state values; 28000 means invalid product key;
             PT409 means state revision conflict.
           content:
@@ -152,7 +152,7 @@ paths:
                       source: {type: string}
                       time:
                         type: string
-                        description: Timestamp accepted by PostgreSQL timestamptz input.
+                        description: RFC 3339 timestamp string.
                       fields:
                         type: object
                         description: Fields validated against the selected stream declaration; values preserve arbitrary JSON.
@@ -173,7 +173,7 @@ paths:
                   dedupeUntil: {type: string, format: date-time}
         default:
           description: >-
-            PostgREST error. SQLSTATE 22023 means invalid batch/event/source or
+            API error. Code 22023 means invalid batch/event/source or
             event fields; 28000 means invalid product key; PT409 means definition
             revision conflict; 23505 means idempotency key conflict or event ID
             reused with different content.
@@ -219,7 +219,7 @@ paths:
                   - $ref: '#/components/schemas/CommandClaim'
         default:
           description: >-
-            PostgREST error. SQLSTATE 22023 means invalid worker/claim arguments;
+            API error. Code 22023 means invalid worker/claim arguments;
             28000 means invalid product key; 23505 means claim ID conflict.
           content:
             application/json:
@@ -266,7 +266,7 @@ paths:
                 $ref: '#/components/schemas/CompletionStatus'
         default:
           description: >-
-            PostgREST error. SQLSTATE 22023 means invalid status/result; 28000
+            API error. Code 22023 means invalid status/result; 28000
             means invalid product key; 42501 means inactive product; 23505 means
             command result conflict; P0002 means command lease not found.
           content:
@@ -290,7 +290,7 @@ components:
     ProductDefinition:
       type: object
       description: >-
-        HSP ProductDefinition v2.0. SQL is authoritative for recursive dashboard
+        HSP ProductDefinition v2.0. The API is authoritative for recursive dashboard
         and component validation; this DTO keeps dashboard contents as opaque JSON.
       required: [type, version, streams, state, commands, dashboards]
       properties:
@@ -317,13 +317,13 @@ components:
     Dashboard:
       type: object
       description: >-
-        Opaque HSP 2.0 dashboard JSON. SQL validates dashboard fields,
+        Opaque HSP 2.0 dashboard JSON. The API validates dashboard fields,
         nonrecursive Surface and SurfaceGroup components, metrics, actions,
         declarations, references, limits, and defaults authoritatively.
       additionalProperties: true
     Field:
       type: object
-      description: HSP field declaration; SQL performs authoritative validation.
+      description: HSP field declaration; the API performs authoritative validation.
       required: [type]
       properties:
         type: {type: string, enum: [number, integer, string, boolean]}
@@ -358,7 +358,7 @@ components:
       type: object
       description: >-
         HSP surface descriptor. Its recursive node and action structures are
-        accepted as JSON here; the database validates them against HSP v1.0 and
+        accepted as JSON here; the API validates them and
         retains its supported unknown-node fallback behavior.
       additionalProperties: true
     CommandClaim:
@@ -378,7 +378,7 @@ components:
       enum: [succeeded, failed, rejected, unknown]
     PostgrestError:
       type: object
-      description: PostgREST JSON error body; SQLSTATE is in code and text in message.
+      description: API JSON error body; the error code is in code and text in message.
       required: [code, message]
       properties:
         code: {type: string}

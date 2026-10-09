@@ -88,7 +88,7 @@ Name | Type | Description  | Notes
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
 **200** | Claimed command object, or JSON null when no work is eligible. |  -  |
-**0** | PostgREST error. SQLSTATE 22023 means invalid worker/claim arguments; 28000 means invalid product key; 23505 means claim ID conflict. |  -  |
+**0** | API error. Code 22023 means invalid worker/claim arguments; 28000 means invalid product key; 23505 means claim ID conflict. |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
@@ -169,7 +169,7 @@ Name | Type | Description  | Notes
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
 **200** | Completed status returned directly as a JSON string. |  -  |
-**0** | PostgREST error. SQLSTATE 22023 means invalid status/result; 28000 means invalid product key; 42501 means inactive product; 23505 means command result conflict; P0002 means command lease not found. |  -  |
+**0** | API error. Code 22023 means invalid status/result; 28000 means invalid product key; 42501 means inactive product; 23505 means command result conflict; P0002 means command lease not found. |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
@@ -250,7 +250,7 @@ Name | Type | Description  | Notes
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
 **200** | Direct JSON RPC result. |  -  |
-**0** | PostgREST error. SQLSTATE 22023 means invalid batch/event/source or event fields; 28000 means invalid product key; PT409 means definition revision conflict; 23505 means idempotency key conflict or event ID reused with different content. |  -  |
+**0** | API error. Code 22023 means invalid batch/event/source or event fields; 28000 means invalid product key; PT409 means definition revision conflict; 23505 means idempotency key conflict or event ID reused with different content. |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
@@ -330,8 +330,8 @@ Name | Type | Description  | Notes
 
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
-**200** | PostgREST table result (one returned row). |  -  |
-**0** | PostgREST error. SQLSTATE 22023 means an invalid ProductDefinition; 28000 means invalid product key; PT409 means definition revision conflict. HTTP status translation is performed by PostgREST. |  -  |
+**200** | API result row (one returned row). |  -  |
+**0** | API error. Code 22023 means an invalid ProductDefinition; 28000 means invalid product key; PT409 means definition revision conflict. HTTP status translation is performed by the API. |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
@@ -411,8 +411,8 @@ Name | Type | Description  | Notes
 
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
-**200** | PostgREST table result (one returned row). |  -  |
-**0** | PostgREST error. SQLSTATE 22023 means a missing/invalid revision or invalid/undeclared state values; 28000 means invalid product key; PT409 means state revision conflict. |  -  |
+**200** | API result row (one returned row). |  -  |
+**0** | API error. Code 22023 means a missing/invalid revision or invalid/undeclared state values; 28000 means invalid product key; PT409 means state revision conflict. |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 

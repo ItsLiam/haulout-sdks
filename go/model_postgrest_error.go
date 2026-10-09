@@ -1,7 +1,7 @@
 /*
 Haulout Provider RPC API
 
-Direct PostgREST RPC contract for Haulout product integrations. The product integration key is supplied as p_product_key in each RPC body. The apikey header uses Haulout's Supabase publishable key; it is not the product key.
+Product integration API for Haulout product integrations. The product integration key is supplied as p_product_key in each RPC body. The apikey header uses Haulout's public service key; it is not the product key.
 
 API version: 1.0.0
 */
@@ -18,7 +18,7 @@ import (
 // checks if the PostgrestError type satisfies the MappedNullable interface at compile time
 var _ MappedNullable = &PostgrestError{}
 
-// PostgrestError PostgREST JSON error body; SQLSTATE is in code and text in message.
+// PostgrestError API JSON error body; the error code is in code and text in message.
 type PostgrestError struct {
 	Code string `json:"code"`
 	Message string `json:"message"`

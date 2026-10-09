@@ -1,6 +1,6 @@
 # ProductDefinition
 
-HSP ProductDefinition v2.0. SQL is authoritative for recursive dashboard and component validation; this DTO keeps dashboard contents as opaque JSON.
+HSP ProductDefinition v2.0. The API is authoritative for recursive dashboard and component validation; this DTO keeps dashboard contents as opaque JSON.
 
 ## Properties
 

@@ -1,7 +1,7 @@
 /*
 Haulout Provider RPC API
 
-Direct PostgREST RPC contract for Haulout product integrations. The product integration key is supplied as p_product_key in each RPC body. The apikey header uses Haulout's Supabase publishable key; it is not the product key.
+Product integration API for Haulout product integrations. The product integration key is supplied as p_product_key in each RPC body. The apikey header uses Haulout's public service key; it is not the product key.
 
 API version: 1.0.0
 */
@@ -18,7 +18,7 @@ import (
 // checks if the ProductDefinition type satisfies the MappedNullable interface at compile time
 var _ MappedNullable = &ProductDefinition{}
 
-// ProductDefinition HSP ProductDefinition v2.0. SQL is authoritative for recursive dashboard and component validation; this DTO keeps dashboard contents as opaque JSON.
+// ProductDefinition HSP ProductDefinition v2.0. The API is authoritative for recursive dashboard and component validation; this DTO keeps dashboard contents as opaque JSON.
 type ProductDefinition struct {
 	Type string `json:"type"`
 	Version string `json:"version"`

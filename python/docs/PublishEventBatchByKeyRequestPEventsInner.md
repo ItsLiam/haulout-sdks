@@ -7,7 +7,7 @@ Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
 **id** | **str** |  | 
 **source** | **str** |  | 
-**time** | **str** | Timestamp accepted by PostgreSQL timestamptz input. | 
+**time** | **str** | RFC 3339 timestamp string. | 
 **fields** | **Dict[str, object]** | Fields validated against the selected stream declaration; values preserve arbitrary JSON. | 
 
 ## Example

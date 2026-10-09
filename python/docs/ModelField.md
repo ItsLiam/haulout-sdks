@@ -1,6 +1,6 @@
 # ModelField
 
-HSP field declaration; SQL performs authoritative validation.
+HSP field declaration; the API performs authoritative validation.
 
 ## Properties
 

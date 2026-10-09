@@ -1,6 +1,6 @@
 # PostgrestError
 
-PostgREST JSON error body; SQLSTATE is in code and text in message.
+API JSON error body; the error code is in code and text in message.
 
 ## Properties
 
