@@ -18,9 +18,9 @@ Python 3.10+
 If the python package is hosted on a repository, you can install directly using:
 
 ```sh
-pip install git+https://github.com/ItsLiam/haulout-sdks.git
+pip install git+https://github.com/ItsLiam/haulout-sdks.git#subdirectory=python
 ```
-(you may need to run `pip` with root permission: `sudo pip install git+https://github.com/ItsLiam/haulout-sdks.git`)
+(you may need to run `pip` with root permission: `sudo pip install git+https://github.com/ItsLiam/haulout-sdks.git#subdirectory=python`)
 
 Then import the package:
 ```python

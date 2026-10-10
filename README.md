@@ -21,7 +21,8 @@ go get github.com/ItsLiam/haulout-sdks/go
 Python:
 
 ```sh
-pip install haulout
+pip install "git+https://github.com/ItsLiam/haulout-sdks.git#subdirectory=python"
+uv pip install "haulout @ git+https://github.com/ItsLiam/haulout-sdks#subdirectory=python"
 ```
 
 ## Quickstart
