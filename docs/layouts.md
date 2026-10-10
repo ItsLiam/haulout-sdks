@@ -39,7 +39,11 @@ Subscriptions bind streams (required: `id`, `source`, `mode`):
 {"id": "telemetry_series", "source": "telemetry", "mode": "timeseries"}
 ```
 
-`mode` is one of `latest`, `timeseries`, `events`. Subscription ids must be unique within the dashboard. Optional `parameters` (up to 8 keys) take Refs, but never series bindings.
+`mode` is one of `latest`, `timeseries`, `events`. Subscription ids must be unique within the dashboard. Optional `parameters` (up to 8 keys) take Refs, but never series bindings. Optional `window` (`"1h"`, `"24h"`, `"7d"`) keeps only events from the last hour / day / week, evaluated when the dashboard renders; without it, charts see all loaded events. A window narrows what is already loaded, it does not fetch older history. Every chart reading a windowed subscription must declare `"requires": {"subscription.window": "1.0"}` on its own metric, or the definition is rejected:
+
+```json
+{"id": "alert_events_1h", "source": "alerts", "mode": "events", "window": "1h"}
+```
 
 View state declares local keys (required: `type`, `default`):
 

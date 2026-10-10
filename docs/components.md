@@ -24,7 +24,7 @@ Parse this block, not the prose. Keys are stable; prose may change.
   {"component": "Surface", "metric": "progress", "required": ["kind", "value", "min", "max"], "optional": ["requires", "format"], "binds": ["literal", "state", "stream", "view", "input"]},
   {"component": "Surface", "metric": "gauge", "required": ["kind", "value", "min", "max"], "optional": ["requires", "format"], "binds": ["literal", "state", "stream", "view", "input"]},
   {"component": "Surface", "metric": "graph.timeseries", "required": ["kind", "series"], "optional": ["requires", "xAxis", "yAxis"], "binds": ["stream"]},
-  {"component": "Surface", "metric": "graph.bar", "required": ["kind", "subscription", "categoryField", "valueField"], "optional": ["requires", "maxCategories", "format"], "binds": ["subscription"]},
+  {"component": "Surface", "metric": "graph.bar", "required": ["kind", "subscription", "categoryField", "valueField"], "optional": ["requires", "maxCategories", "format", "aggregation"], "binds": ["subscription"]},
   {"component": "Surface", "metric": "input.toggle", "required": ["kind", "value"], "optional": ["onChange", "requires"], "binds": ["view"]},
   {"component": "Surface", "metric": "input.choice", "required": ["kind", "value", "choices"], "optional": ["onChange", "requires"], "binds": ["view"]},
   {"component": "Surface", "metric": "input.text", "required": ["kind"], "optional": ["value", "onChange", "requires", "placeholder", "secure", "maxLength", "keyboard"], "binds": ["view"]},
@@ -238,26 +238,33 @@ Binding: every `series[].data` must be a `stream` Ref with `selector: "series"`,
 
 ## Metric: graph.bar
 
-Use for per-event rows over an events subscription (alert counts by zone). Do not expect category aggregation: bars render per-event rows, not rolled-up totals. This metric binds by subscription id plus field names, not by Refs.
+Use for per-event rows or grouped totals over an events subscription (alert counts by zone). This metric binds by subscription id plus field names, not by Refs.
 
 ```json
 {"kind": "graph.bar", "subscription": "alert_events", "categoryField": "zone", "valueField": "count", "maxCategories": 12}
 ```
 
+Without `aggregation`, bars render one row per event (most recent first, up to `maxCategories`, default 20). With `"aggregation": "sum"`, events group by category and each bar is the total of `valueField`; with `"aggregation": "count"`, each bar is the number of events in that category (`valueField` must still be declared). Grouped bars sort by value descending, then category name ascending, and keep the top `maxCategories` (default 20). A metric using `aggregation` must declare `"requires": {"graph.bar": "1.1"}` or the definition is rejected.
+
 | Prop | Required | Type | Notes |
 |---|---|---|---|
 | `kind` | Yes | const `"graph.bar"` | — |
 | `subscription` | Yes | id string | Must resolve to a subscription in `events` mode over an events stream. |
-| `categoryField` | Yes | string | Must be a declared string field of the stream. |
+| `categoryField` | Yes | string | Must be a declared string or numeric field of the stream. |
 | `valueField` | Yes | string | Must be a declared numeric field of the stream. |
-| `maxCategories` | No | integer 1–100 | Caps rendered rows. |
-| `requires` | No | object ≤32 props | Hosts support this kind at `1.0`. |
+| `maxCategories` | No | integer 1–100 | Caps rendered rows (per-event) or groups (aggregated). Default 20. |
+| `aggregation` | No | `"sum"` \| `"count"` | Grouped totals; requires `graph.bar` 1.1 (see `requires`). |
+| `requires` | No | object ≤32 props | Hosts support per-event rows at `1.0`; `aggregation` needs `1.1`. |
 | `format` | No | Format | Formats the values. |
 
 Binding: no Refs. The named subscription must exist on the same dashboard with `mode: "events"`.
 
 ```json
 {"type": "Surface", "id": "alert_counts", "title": "Count per alert (zone)", "metric": {"kind": "graph.bar", "subscription": "alert_events", "categoryField": "zone", "valueField": "count", "maxCategories": 12}}
+```
+
+```json
+{"type": "Surface", "id": "alert_totals", "title": "Total alerts by zone", "metric": {"kind": "graph.bar", "subscription": "alert_events", "categoryField": "zone", "valueField": "count", "aggregation": "sum", "requires": {"graph.bar": "1.1"}}}
 ```
 
 ## Metric: input.toggle
