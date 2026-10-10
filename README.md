@@ -86,11 +86,19 @@ print(rows[0].revision, rows[0].hash)
 
 ## Docs
 
+Start here:
+
 - `docs/getting-started.md` — setup and first write.
 - `docs/authentication.md` — product-key handling.
+
+Run the integration:
+
 - `docs/definitions-state.md` — definition/state writes, revisions, conflicts.
 - `docs/events.md` — event batches, idempotency, receipts.
 - `docs/commands.md` — claim/complete loop, leases, results.
 - `docs/errors.md` — error shape and per-operation codes.
-- `docs/components.md` — Surface/SurfaceGroup reference, every metric kind, bindings.
-- `docs/layouts.md` — dashboard shell, grid model, composition patterns, compose loop.
+
+Compose dashboards:
+
+- `docs/components.md` — every metric kind with JSON shapes for building dashboard cells.
+- `docs/layouts.md` — dashboard shell, grid/spans, and the compose loop for full pages.
