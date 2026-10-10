@@ -55,7 +55,7 @@ Success returns a one-row array: `revision` (old revision + 1) and `hash` (`sha2
 
 These snippets need a live product key; without one they do not run.
 
-## The five methods
+## The six methods
 
 Go (all hang off `client.DefaultAPI`, take `ctx`, and end in `.Execute()`):
 

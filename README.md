@@ -1,10 +1,11 @@
 # Haulout Provider SDKs
 
-Clients for product integrations. Five operations, keyed by your product key:
+Clients for product integrations. Six operations, keyed by your product key:
 
 - Replace the product definition (compare-and-swap on revision).
 - Replace product state values (compare-and-swap on revision).
 - Publish idempotent event batches.
+- Purge stored events by source (provider-driven retention).
 - Claim queued commands with a short lease.
 - Complete leased commands with a JSON result.
 

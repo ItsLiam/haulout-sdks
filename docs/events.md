@@ -74,4 +74,4 @@ Python attributes: `receipt.accepted`, `receipt.duplicates`, `receipt.cursor`, `
 - A `p_definition_revision` that does not match the active revision conflicts (code `PT409`).
 - On ambiguous network outcome, retry with the same idempotency UUID and byte-identical events; never mint a fresh UUID for the same logical batch.
 
-Event-query/history reads are omitted: no such operation exists in the five-RPC contract.
+Event-query/history reads are omitted: no such operation exists in the six-RPC contract. The sixth RPC is provider-driven `purge_events_by_key(p_product_key, p_idempotency_key, p_definition_revision, p_sources, p_before)`, where `p_sources` is a list of 1–128 declared stream names and `p_before` is a nullable timestamp bound. Warning: purging a source S deletes all of the product's events with source S (bounded by `p_before` when given); there is no per-event or whole-product form.
