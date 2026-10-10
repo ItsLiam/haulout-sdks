@@ -92,3 +92,5 @@ print(rows[0].revision, rows[0].hash)
 - `docs/events.md` — event batches, idempotency, receipts.
 - `docs/commands.md` — claim/complete loop, leases, results.
 - `docs/errors.md` — error shape and per-operation codes.
+- `docs/components.md` — Surface/SurfaceGroup reference, every metric kind, bindings.
+- `docs/layouts.md` — dashboard shell, grid model, composition patterns, compose loop.
