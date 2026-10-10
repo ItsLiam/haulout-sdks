@@ -112,7 +112,7 @@ A wide group (`span: 2`) of headline metrics first, then full-width detail Surfa
 {"type": "Dashboard", "version": "2.0", "id": "overview", "title": "Overview", "components": [{"type": "SurfaceGroup", "id": "live", "title": "Live", "span": 2, "metrics": []}, {"type": "Surface", "id": "detail", "title": "Detail", "metric": {"kind": "number", "...": "..."}}]}
 ```
 
-Metric bodies: `components.md#metric-number`, `#metric-progress`, `#metric-gauge`.
+Metric bodies: `components.md#metric-number`, `#metric-progress`, `#metric-gauge`. A static `table` Surface (`components.md#metric-table`) also fits here as a full-width detail row when the data is already bound.
 
 ### Pattern C: charts page {#pattern-c}
 

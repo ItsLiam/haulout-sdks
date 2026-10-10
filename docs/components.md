@@ -25,6 +25,7 @@ Parse this block, not the prose. Keys are stable; prose may change.
   {"component": "Surface", "metric": "gauge", "required": ["kind", "value", "min", "max"], "optional": ["requires", "format"], "binds": ["literal", "state", "stream", "view", "input"]},
   {"component": "Surface", "metric": "graph.timeseries", "required": ["kind", "series"], "optional": ["requires", "xAxis", "yAxis"], "binds": ["stream"]},
   {"component": "Surface", "metric": "graph.bar", "required": ["kind", "subscription", "categoryField", "valueField"], "optional": ["requires", "maxCategories", "format", "aggregation"], "binds": ["subscription"]},
+  {"component": "Surface", "metric": "table", "required": ["kind", "columns", "rows"], "optional": ["requires"], "binds": ["literal", "state", "stream", "view"]},
   {"component": "Surface", "metric": "input.toggle", "required": ["kind", "value"], "optional": ["onChange", "requires"], "binds": ["view"]},
   {"component": "Surface", "metric": "input.choice", "required": ["kind", "value", "choices"], "optional": ["onChange", "requires"], "binds": ["view"]},
   {"component": "Surface", "metric": "input.text", "required": ["kind"], "optional": ["value", "onChange", "requires", "placeholder", "secure", "maxLength", "keyboard"], "binds": ["view"]},
@@ -53,7 +54,7 @@ Use Surface for one metric: one value, one chart, one control. Do not use it for
 | `type` | Yes | const `"Surface"` | Discriminator. |
 | `id` | Yes | id string | Unique across the dashboard's components and group cells. |
 | `title` | Yes | string ≤1024 | Display title and accessibility name. |
-| `metric` | Yes | Metric | One of the 13 kinds below, or a forward-compatible unknown kind. |
+| `metric` | Yes | Metric | One of the 14 kinds below, or a forward-compatible unknown kind. |
 | `span` | No | integer 1–24, default 1 | Width on the outer grid; clamped at render, never mutated. |
 | `requires` | No | object ≤32 props | Capability gates; values are `major.minor` strings. |
 | `fallback` | No | const `"drop"` | Only value allowed; unsupported Surface is dropped. |
@@ -267,6 +268,29 @@ Binding: no Refs. The named subscription must exist on the same dashboard with `
 {"type": "Surface", "id": "alert_totals", "title": "Total alerts by zone", "metric": {"kind": "graph.bar", "subscription": "alert_events", "categoryField": "zone", "valueField": "count", "aggregation": "sum", "requires": {"graph.bar": "1.1"}}}
 ```
 
+## Metric: table
+
+Use for a small read-only grid over existing bindings (fleet snapshot, zone counts). Do not use it for charts, inputs, or paged data: rows render in declared order with no sorting, filtering, or pagination. Cells are scalar Refs only; array indexes never resolve.
+
+```json
+{"kind": "table",
+ "columns": [{"label": "Device"}, {"label": "Count", "format": {"style": "number"}}],
+ "rows": [[{"kind": "literal", "value": "Dock A"}, {"kind": "literal", "value": 12}]]}
+```
+
+| Prop | Required | Type | Notes |
+|---|---|---|---|
+| `kind` | Yes | const `"table"` | — |
+| `columns` | Yes | array 1–12 | Each `{label, format?}`; `label` ≤1024, `format` is column-level Format. |
+| `rows` | Yes | array 1–32 | Rectangular: every row holds exactly one cell per column. |
+| `requires` | No | object ≤32 props | Hosts support `table` at `1.0`; no entry needed. |
+
+Binding: every cell must be a scalar Ref — `literal`, `view`, `state`, or `stream` with `selector: "latest"`. `series` selectors and `input` Refs are rejected. `state` paths address object-keyed leaves (`top.c0.country`); array indexes never resolve. Cells render single-line via the column `format`; missing values render as `—`.
+
+```json
+{"type": "Surface", "id": "fleet_snapshot", "title": "Fleet snapshot", "metric": {"kind": "table", "columns": [{"label": "Device"}, {"label": "Count", "format": {"style": "number"}}], "rows": [[{"kind": "literal", "value": "Dock A"}, {"kind": "literal", "value": 12}]]}}
+```
+
 ## Metric: input.toggle
 
 Use for a local on/off switch (reminder preference, flag). Do not use it to write shared product state: view-bound edits update only the local view, never shared state.
@@ -403,7 +427,7 @@ Binding: `view` Refs only; resolved values are strings.
 
 ## Forward compatibility: unknown metric kinds
 
-A metric whose `kind` is not one of the 13 above is accepted only with a declared fallback: `"drop"`, or a text substitute `{kind: "text", value, format?}` rendered where the unknown metric would appear. Anything else makes the whole Surface unparsable.
+A metric whose `kind` is not one of the 14 above is accepted only with a declared fallback: `"drop"`, or a text substitute `{kind: "text", value, format?}` rendered where the unknown metric would appear. Anything else makes the whole Surface unparsable.
 
 ```json
 {"kind": "future.metric", "fallback": "drop"}
