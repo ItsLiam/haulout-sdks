@@ -25,8 +25,8 @@ Parse this block, not the prose. Keys are stable; prose may change.
   {"component": "Surface", "metric": "gauge", "required": ["kind", "value", "min", "max"], "optional": ["requires", "format"], "binds": ["literal", "state", "stream", "view", "input"]},
   {"component": "Surface", "metric": "graph.timeseries", "required": ["kind", "series"], "optional": ["requires", "xAxis", "yAxis"], "binds": ["stream"]},
   {"component": "Surface", "metric": "graph.bar", "required": ["kind", "subscription", "categoryField", "valueField"], "optional": ["requires", "maxCategories", "format"], "binds": ["subscription"]},
-  {"component": "Surface", "metric": "input.toggle", "required": ["kind"], "optional": ["value", "onChange", "requires"], "binds": ["view"]},
-  {"component": "Surface", "metric": "input.choice", "required": ["kind", "choices"], "optional": ["value", "onChange", "requires"], "binds": ["view"]},
+  {"component": "Surface", "metric": "input.toggle", "required": ["kind", "value"], "optional": ["onChange", "requires"], "binds": ["view"]},
+  {"component": "Surface", "metric": "input.choice", "required": ["kind", "value", "choices"], "optional": ["onChange", "requires"], "binds": ["view"]},
   {"component": "Surface", "metric": "input.text", "required": ["kind"], "optional": ["value", "onChange", "requires", "placeholder", "secure", "maxLength", "keyboard"], "binds": ["view"]},
   {"component": "Surface", "metric": "input.number", "required": ["kind"], "optional": ["value", "onChange", "requires", "min", "max", "step"], "binds": ["view"]},
   {"component": "Surface", "metric": "input.date", "required": ["kind"], "optional": ["value", "onChange", "requires"], "binds": ["view"]},
@@ -271,7 +271,7 @@ Use for a local on/off switch (reminder preference, flag). Do not use it to writ
 | Prop | Required | Type | Notes |
 |---|---|---|---|
 | `kind` | Yes | const `"input.toggle"` | — |
-| `value` | No | Ref | When present, must be a `view` Ref to a declared boolean key. |
+| `value` | Yes | Ref | Must be a `view` Ref to a declared boolean key. |
 | `onChange` | No | Action | Fired on toggle; often `Action.SetViewState`. |
 | `requires` | No | object ≤32 props | Capability gates. |
 
@@ -292,7 +292,7 @@ Use for a local single choice (reporting zone, display mode). Do not use free te
 | Prop | Required | Type | Notes |
 |---|---|---|---|
 | `kind` | Yes | const `"input.choice"` | — |
-| `value` | No | Ref | When present, must be a `view` Ref type-matching the choices. |
+| `value` | Yes | Ref | Must be a `view` Ref type-matching the choices. |
 | `choices` | Yes | array 1–100 | Items: `title` ≤1024 required, `value` scalar-or-null required. |
 | `onChange` | No | Action | Fired on selection. |
 | `requires` | No | object ≤32 props | Capability gates. |
