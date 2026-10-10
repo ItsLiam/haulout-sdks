@@ -23,8 +23,8 @@ Parse this block, not the prose. Keys are stable; prose may change.
   {"component": "Surface", "metric": "status", "required": ["kind", "value", "mapping"], "optional": ["requires"], "binds": ["literal", "state", "stream", "view", "input"]},
   {"component": "Surface", "metric": "progress", "required": ["kind", "value", "min", "max"], "optional": ["requires", "format"], "binds": ["literal", "state", "stream", "view", "input"]},
   {"component": "Surface", "metric": "gauge", "required": ["kind", "value", "min", "max"], "optional": ["requires", "format"], "binds": ["literal", "state", "stream", "view", "input"]},
-  {"component": "Surface", "metric": "graph.timeseries", "required": ["kind", "series"], "optional": ["requires", "xAxis", "yAxis"], "binds": ["stream"]},
-  {"component": "Surface", "metric": "graph.bar", "required": ["kind", "subscription", "categoryField", "valueField"], "optional": ["requires", "maxCategories", "format", "aggregation"], "binds": ["subscription"]},
+  {"component": "Surface", "metric": "graph.timeseries", "required": ["kind", "series"], "optional": ["requires", "xAxis", "yAxis", "series[].color"], "binds": ["stream"]},
+  {"component": "Surface", "metric": "graph.bar", "required": ["kind", "subscription", "categoryField", "valueField"], "optional": ["requires", "maxCategories", "format", "aggregation", "color"], "binds": ["subscription"]},
   {"component": "Surface", "metric": "table", "required": ["kind", "columns", "rows"], "optional": ["requires"], "binds": ["literal", "state", "stream", "view"]},
   {"component": "Surface", "metric": "input.toggle", "required": ["kind", "value"], "optional": ["onChange", "requires"], "binds": ["view"]},
   {"component": "Surface", "metric": "input.choice", "required": ["kind", "value", "choices"], "optional": ["onChange", "requires"], "binds": ["view"]},
@@ -226,7 +226,7 @@ Use for a time-series chart. Do not put two series in one chart: use one single-
 | Prop | Required | Type | Notes |
 |---|---|---|---|
 | `kind` | Yes | const `"graph.timeseries"` | — |
-| `series` | Yes | Series array, 1–12 items | Each needs `label` ≤1024 and `data` Ref. Keep to 1 entry. |
+| `series` | Yes | Series array, 1–12 items | Each needs `label` ≤1024 and `data` Ref. Keep to 1 entry. Each entry may set optional strict-hex `color` (`#rrggbb`): invalid rejects the definition, absent renders the host default, old hosts ignore it (no `requires`). |
 | `requires` | No | object ≤32 props | Hosts support this kind at `1.0`; gate newer needs here. |
 | `xAxis` | No | object | If present, must be exactly `{"kind": "time"}`. |
 | `yAxis` | No | object | Optional `{min, max}` numbers; ordering not checked. |
@@ -256,7 +256,7 @@ Without `aggregation`, bars render one row per event (most recent first, up to `
 | `maxCategories` | No | integer 1–100 | Caps rendered rows (per-event) or groups (aggregated). Default 20. |
 | `aggregation` | No | `"sum"` \| `"count"` | Grouped totals; requires `graph.bar` 1.1 (see `requires`). |
 | `requires` | No | object ≤32 props | Hosts support per-event rows at `1.0`; `aggregation` needs `1.1`. |
-| `format` | No | Format | Formats the values. |
+| `color` | No | strict hex `#rrggbb` | Optional single fill for all bars; invalid rejects the definition, absent renders the host default, old hosts ignore it (no `requires`). |
 
 Binding: no Refs. The named subscription must exist on the same dashboard with `mode: "events"`.
 

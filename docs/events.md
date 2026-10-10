@@ -6,6 +6,7 @@ Publish 1–100 events per call against the active definition revision. The batc
 
 - Required: `p_product_key`, `p_idempotency_key` (UUID), `p_definition_revision` (integer >= 0, must equal the active definition revision), `p_events` (1–100 items).
 - Each event: `id` (string), `source` (string), `time` (timestamp string), `fields` (object validated against the selected stream declaration; values preserve arbitrary JSON).
+- `source` must exactly equal a declared stream name (case-sensitive key lookup, no prefix or pattern matching); anything else rejects the whole batch (`22023 'undeclared event source'`). Stream names satisfy `[a-z][a-z0-9_.-]{0,63}` — `/` is not allowed, use `.` (e.g. `"sensor.thermostat"`).
 - Limits: the encoded batch and each event `fields` object are limited to 131072 bytes.
 
 Go:
@@ -42,7 +43,7 @@ request = PublishEventBatchByKeyRequest(
         PublishEventBatchByKeyRequestPEventsInner.from_dict(
             {
                 "id": "evt-1",
-                "source": "sensor/thermostat",
+                "source": "sensor.thermostat",
                 "time": "2025-04-05T00:37:08.123456Z",
                 "fields": {"temperature": 21.5},
             }
