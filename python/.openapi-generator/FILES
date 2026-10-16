@@ -1,13 +1,4 @@
 .gitignore
-README.md
-docs/DefaultApi.md
-docs/DeleteMetricsByKeyRequest.md
-docs/DeletedMetric.md
-docs/Metric.md
-docs/MetricFormat.md
-docs/MetricWriteResult.md
-docs/PostgrestError.md
-docs/PutMetricsByKeyRequest.md
 haulout/__init__.py
 haulout/api/__init__.py
 haulout/api/default_api.py

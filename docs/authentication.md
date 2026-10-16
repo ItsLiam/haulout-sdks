@@ -1,8 +1,13 @@
 # Authentication
 
-## One credential: the product key
+## Two keys, two places
 
-Put your product key in the `p_product_key` field of every request. The client already carries the hosted endpoint and its public service key as defaults; never configure URLs or extra keys. The service key is sent in the `apikey` header and is not the product key.
+| Key | Where it goes | Who owns it |
+| --- | --- | --- |
+| Product key | `p_product_key` in the request body | Your product. Shown once by Haulout; stored only as a hash. |
+| Service key | `apikey` header | Haulout's public key, built into the SDK defaults (`x-haulout-service-key` in [`../openapi.yaml`](../openapi.yaml)). |
+
+The client already carries the hosted endpoint and the service key. Never configure URLs or extra keys. Put only the product key in your code, from the environment.
 
 Go (key is the first constructor argument):
 
@@ -10,7 +15,7 @@ Go (key is the first constructor argument):
 request := haulout.NewPutMetricsByKeyRequest(os.Getenv("HAULOUT_PRODUCT_KEY"), metrics)
 ```
 
-Python (key is the `p_product_key` keyword):
+Python (key is the `p_product_key` keyword; `import os` first):
 
 ```python
 from haulout import PutMetricsByKeyRequest
@@ -23,11 +28,14 @@ request = PutMetricsByKeyRequest(
 
 ## Handling
 
-- Load the key from the environment (`HAULOUT_PRODUCT_KEY`); never commit it to source control.
+- Load the product key from the environment (`HAULOUT_PRODUCT_KEY`); never commit it to source control.
 - Never place it in an `Authorization` header or log request bodies; bodies contain the key by design.
 - Do not enable HTTP debug logging that records request bodies.
-- Key rotation immediately invalidates the previous key. Treat rotation as instant: all calls must use the new key.
+- Rotation immediately revokes the previous key. Update every producer at the time you rotate; until then their writes fail with `403` / `28000`.
 
-## Failure mode
+## Failure modes
 
-An invalid product key fails with error code `28000`. See [`errors.md`](errors.md).
+- Wrong product key: `403`, code `28000`, message `invalid product key`.
+- Wrong service key in `apikey`: `401` from the API gateway, body `{"message": "Invalid API key", ...}` with no `code`.
+
+See [`errors.md`](errors.md).
