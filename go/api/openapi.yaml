@@ -4,24 +4,25 @@ info:
     integration key is supplied as p_product_key in each RPC body. The apikey header
     uses Haulout's public service key; it is not the product key.
   title: Haulout Provider RPC API
-  version: 1.0.0
+  version: 2.0.0
 servers:
 - url: https://qszqptdtmkppelqligvb.supabase.co/rest/v1
 security:
 - HauloutServiceKey: []
 paths:
-  /rpc/write_definition_by_key:
+  /rpc/put_metrics_by_key:
     post:
-      description: Replaces the complete HSP ProductDefinition only when the current
-        definition revision equals p_expected_revision. On success the revision increments
-        by one. Definition payloads are limited to 1 MiB. The returned hash is sha256:<lowercase
-        hex>. No argument has a SQL default.
-      operationId: writeDefinitionByKey
+      description: Upserts 1–100 current metric values for the product. Writes are
+        last-write-wins with no compare-and-swap or idempotency receipt. A put replaces
+        the whole metric; omitted label and format become null. An identical rewrite
+        is a no-op and returns the existing revision. A product may hold at most 256
+        metrics. Batches are limited to 1 MiB. No argument has a SQL default.
+      operationId: putMetricsByKey
       requestBody:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/writeDefinitionByKey_request"
+              $ref: "#/components/schemas/putMetricsByKey_request"
         required: true
       responses:
         "200":
@@ -29,31 +30,29 @@ paths:
             application/json:
               schema:
                 items:
-                  $ref: "#/components/schemas/writeDefinitionByKey_200_response_inner"
+                  $ref: "#/components/schemas/MetricWriteResult"
                 type: array
-          description: API result row (one returned row).
+          description: "One row per input metric, in input order."
         default:
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/PostgrestError"
-          description: API error. Code 22023 means an invalid ProductDefinition; 28000
-            means invalid product key; PT409 means definition revision conflict. HTTP
-            status translation is performed by the API.
-      summary: Compare-and-swap a product definition
-  /rpc/write_state_by_key:
+          description: "API error. Code 22023 means an invalid metric, value shape,\
+            \ batch, duplicate key, or product metric limit. Code 28000 means an invalid\
+            \ product key."
+      summary: Upsert current metric values
+  /rpc/delete_metrics_by_key:
     post:
-      description: "Writes the complete state values object after validating declared\
-        \ HSP state fields. An identical existing value is returned without changing\
-        \ its revision, even if the supplied expected revision is stale. Empty initial\
-        \ state has revision zero; its first successful write produces revision one.\
-        \ Payload is limited to 1 MiB. No argument has a SQL default."
-      operationId: writeStateByKey
+      description: "Deletes the listed metric keys from the product. Unknown keys\
+        \ are ignored, so retries are safe. Returns the keys actually deleted. Accepts\
+        \ 1–256 keys. No argument has a SQL default."
+      operationId: deleteMetricsByKey
       requestBody:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/writeStateByKey_request"
+              $ref: "#/components/schemas/deleteMetricsByKey_request"
         required: true
       responses:
         "200":
@@ -61,275 +60,125 @@ paths:
             application/json:
               schema:
                 items:
-                  $ref: "#/components/schemas/writeStateByKey_200_response_inner"
+                  $ref: "#/components/schemas/DeletedMetric"
                 type: array
-          description: API result row (one returned row).
+          description: "Keys deleted by this call, one row per deleted metric."
         default:
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/PostgrestError"
-          description: API error. Code 22023 means a missing/invalid revision or invalid/undeclared
-            state values; 28000 means invalid product key; PT409 means state revision
-            conflict.
-      summary: Compare-and-swap product state
-  /rpc/publish_event_batch_by_key:
-    post:
-      description: "Requires the active definition revision. Accepts 1–100 events;\
-        \ the encoded batch and each event fields object are limited to 131072 bytes.\
-        \ The product-scoped idempotency receipt is valid for 24 hours. Reusing an\
-        \ event ID with identical source, revision, timestamp and fields counts as\
-        \ a duplicate; changed content conflicts. No argument has a SQL default."
-      operationId: publishEventBatchByKey
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/publishEventBatchByKey_request"
-        required: true
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/publishEventBatchByKey_200_response"
-          description: Direct JSON RPC result.
-        default:
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/PostgrestError"
-          description: API error. Code 22023 means invalid batch/event/source or event
-            fields; 28000 means invalid product key; PT409 means definition revision
-            conflict; 23505 means idempotency key conflict or event ID reused with
-            different content.
-      summary: Publish an idempotent event batch
-  /rpc/claim_command_by_key:
-    post:
-      description: Claims the first eligible accepted command with a 45-second lease.
-        Expired accepted commands become expired; expired running commands become
-        unknown and are not silently rerun. A repeated claim UUID for the same worker
-        returns the same claim; using it for another worker conflicts. HTTP 200 with
-        JSON null means there is no eligible work. No argument has a SQL default.
-      operationId: claimCommandByKey
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/claimCommandByKey_request"
-        required: true
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                allOf:
-                - $ref: "#/components/schemas/CommandClaim"
-                nullable: true
-          description: "Claimed command object, or JSON null when no work is eligible."
-        default:
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/PostgrestError"
-          description: API error. Code 22023 means invalid worker/claim arguments;
-            28000 means invalid product key; 23505 means claim ID conflict.
-      summary: Claim the next eligible command
-  /rpc/complete_command_by_key:
-    post:
-      description: "Reports succeeded, failed or rejected. Result is arbitrary JSON\
-        \ including scalar, array and null values, and is limited to 131072 bytes.\
-        \ Completion at or after lease expiry records/returns unknown with null result.\
-        \ Repeating the same lease/status/result is idempotent; changed content conflicts.\
-        \ No argument has a SQL default."
-      operationId: completeCommandByKey
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/completeCommandByKey_request"
-        required: true
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/CompletionStatus"
-          description: Completed status returned directly as a JSON string.
-        default:
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/PostgrestError"
-          description: API error. Code 22023 means invalid status/result; 28000 means
-            invalid product key; 42501 means inactive product; 23505 means command
-            result conflict; P0002 means command lease not found.
-      summary: Complete a leased command
+          description: API error. Code 22023 means invalid or out-of-range keys. Code
+            28000 means an invalid product key.
+      summary: Delete current metric values
 components:
   schemas:
     ProductKey:
-      description: The product's current integration key (hk_<test|live>.<product
-        UUID>.<base64url secret>). Supplied only in p_product_key; rotation invalidates
-        the old key immediately.
+      description: The product's current integration key. Supplied only in p_product_key;
+        rotation invalidates the previous key immediately.
       type: string
-    ProductDefinition:
-      description: HSP ProductDefinition v2.0. The API is authoritative for recursive
-        dashboard and component validation; this DTO keeps dashboard contents as opaque
-        JSON.
+    MetricKey:
+      description: "Metric identifier, unique within a product."
+      pattern: "^[a-z][a-z0-9_.-]{0,63}$"
+      type: string
+    Metric:
+      description: "One current metric value. The value shape depends on kind and\
+        \ is validated by the API: number: a JSON number; text: a string up to 4096\
+        \ characters; status: {state: neutral|positive|warning|critical, text}; progress:\
+        \ {current >= 0, total > 0}; gauge: {value, min, max}; list: {items: [{id,\
+        \ label, detail?, done?, progress?, state?}]}, up to 500 items; timeseries:\
+        \ {series: [{label, color?, points: [{t, v}]}]}, 1–8 series of up to 2000\
+        \ points each; t is an RFC 3339 timestamp and v is a number or null (a gap);\
+        \ bar: {bars: [{label, value, color?}]}, 1–100 bars; table: {columns: [label],\
+        \ rows: [[scalar]]}, 1–16 columns and up to 500 rows."
       properties:
-        type:
-          enum:
-          - ProductDefinition
+        key:
+          description: "Metric identifier, unique within a product."
+          pattern: "^[a-z][a-z0-9_.-]{0,63}$"
           type: string
-        version:
-          enum:
-          - "2.0"
-          type: string
-        streams:
-          additionalProperties:
-            $ref: "#/components/schemas/Stream"
-          description: Map of declared stream names to HSP stream descriptions.
-          type: object
-        state:
-          additionalProperties:
-            $ref: "#/components/schemas/Field"
-          description: Map of declared state paths to field declarations.
-          type: object
-        commands:
-          additionalProperties:
-            $ref: "#/components/schemas/Command"
-          description: Map of declared command names to command declarations.
-          type: object
-        dashboards:
-          description: Ordered dashboard descriptors. Their recursively validated
-            HSP 2.0 structures are transported as opaque JSON by this generated DTO.
-          items:
-            $ref: "#/components/schemas/Dashboard"
-          type: array
-      required:
-      - commands
-      - dashboards
-      - state
-      - streams
-      - type
-      - version
-      type: object
-    Dashboard:
-      additionalProperties: true
-      description: "Opaque HSP 2.0 dashboard JSON. The API validates dashboard fields,\
-        \ nonrecursive Surface and SurfaceGroup components, metrics, actions, declarations,\
-        \ references, limits, and defaults authoritatively."
-      type: object
-    Field:
-      description: HSP field declaration; the API performs authoritative validation.
-      properties:
-        type:
-          enum:
-          - number
-          - integer
-          - string
-          - boolean
-          type: string
-        required:
-          type: boolean
-        unit:
-          type: string
-        minimum:
-          format: double
-          type: number
-        maximum:
-          format: double
-          type: number
-        maxLength:
-          maximum: 4096
-          minimum: 1
-          type: integer
-        enum:
-          items: {}
-          type: array
-      required:
-      - type
-      type: object
-    Stream:
-      properties:
         kind:
           enum:
+          - number
+          - text
+          - status
+          - progress
+          - gauge
+          - list
           - timeseries
-          - events
-          - latest
+          - bar
+          - table
           type: string
-        fields:
-          additionalProperties:
-            $ref: "#/components/schemas/Field"
-          type: object
-        description:
+        label:
+          maxLength: 100
+          minLength: 1
+          type: string
+        format:
+          $ref: "#/components/schemas/MetricFormat"
+        value:
+          description: Kind-specific value; see the Metric description.
+      required:
+      - key
+      - kind
+      - value
+      type: object
+    MetricFormat:
+      description: Display hint for a metric value.
+      properties:
+        style:
+          enum:
+          - number
+          - percent
+          - bytes
+          - duration
+          - rate
+          - temperature
+          - date
+          - time
+          - dateTime
+          type: string
+        precision:
+          maximum: 6
+          minimum: 0
+          type: integer
+        unit:
+          maxLength: 32
           type: string
       required:
-      - fields
-      - kind
+      - style
       type: object
-    Command:
+    MetricWriteResult:
+      example:
+        key: key
+        revision: 1
+        updated_at: 2000-01-23T04:56:07.000+00:00
       properties:
-        title:
+        key:
+          description: "Metric identifier, unique within a product."
+          pattern: "^[a-z][a-z0-9_.-]{0,63}$"
           type: string
-        danger:
-          enum:
-          - normal
-          - destructive
-          type: string
-        arguments:
-          additionalProperties:
-            $ref: "#/components/schemas/Field"
-          type: object
-        timeoutSeconds:
-          maximum: 30
+        revision:
+          format: int64
           minimum: 1
           type: integer
-      required:
-      - arguments
-      - danger
-      - title
-      type: object
-    Surface:
-      additionalProperties: true
-      description: HSP surface descriptor. Its recursive node and action structures
-        are accepted as JSON here; the API validates them and retains its supported
-        unknown-node fallback behavior.
-      type: object
-    CommandClaim:
-      properties:
-        commandId:
-          format: uuid
-          type: string
-        command:
-          type: string
-        arguments:
-          additionalProperties: true
-          type: object
-        definitionRevision:
-          format: int64
-          type: integer
-        leaseId:
-          format: uuid
-          type: string
-        leaseExpiresAt:
+        updated_at:
           format: date-time
           type: string
       required:
-      - arguments
-      - command
-      - commandId
-      - definitionRevision
-      - leaseExpiresAt
-      - leaseId
+      - key
+      - revision
+      - updated_at
       type: object
-    CompletionStatus:
-      enum:
-      - succeeded
-      - failed
-      - rejected
-      - unknown
-      type: string
+    DeletedMetric:
+      example:
+        key: key
+      properties:
+        key:
+          description: "Metric identifier, unique within a product."
+          pattern: "^[a-z][a-z0-9_.-]{0,63}$"
+          type: string
+      required:
+      - key
+      type: object
     PostgrestError:
       description: API JSON error body; the error code is in code and text in message.
       example:
@@ -352,200 +201,37 @@ components:
       - code
       - message
       type: object
-    writeDefinitionByKey_request:
+    putMetricsByKey_request:
       properties:
         p_product_key:
-          description: The product's current integration key (hk_<test|live>.<product
-            UUID>.<base64url secret>). Supplied only in p_product_key; rotation invalidates
-            the old key immediately.
+          description: The product's current integration key. Supplied only in p_product_key;
+            rotation invalidates the previous key immediately.
           type: string
-        p_expected_revision:
-          format: int64
-          minimum: 0
-          type: integer
-        p_definition:
-          $ref: "#/components/schemas/ProductDefinition"
-      required:
-      - p_definition
-      - p_expected_revision
-      - p_product_key
-      type: object
-    writeDefinitionByKey_200_response_inner:
-      example:
-        revision: 0
-        hash: hash
-      properties:
-        revision:
-          format: int64
-          type: integer
-        hash:
-          pattern: "^sha256:[0-9a-f]{64}$"
-          type: string
-      required:
-      - hash
-      - revision
-      type: object
-    writeStateByKey_request:
-      properties:
-        p_product_key:
-          description: The product's current integration key (hk_<test|live>.<product
-            UUID>.<base64url secret>). Supplied only in p_product_key; rotation invalidates
-            the old key immediately.
-          type: string
-        p_expected_revision:
-          format: int64
-          minimum: 0
-          type: integer
-        p_values:
-          additionalProperties: true
-          description: Bounded values object; properties and their values are validated
-            against declared HSP state fields. Values may be nested objects where
-            the declaration uses dotted paths.
-          type: object
-      required:
-      - p_expected_revision
-      - p_product_key
-      - p_values
-      type: object
-    writeStateByKey_200_response_inner:
-      example:
-        revision: 0
-        values:
-          key: ""
-      properties:
-        revision:
-          format: int64
-          type: integer
-        values:
-          additionalProperties: true
-          type: object
-      required:
-      - revision
-      - values
-      type: object
-    publishEventBatchByKey_request_p_events_inner:
-      properties:
-        id:
-          type: string
-        source:
-          type: string
-        time:
-          description: RFC 3339 timestamp string.
-          type: string
-        fields:
-          additionalProperties: true
-          description: Fields validated against the selected stream declaration; values
-            preserve arbitrary JSON.
-          type: object
-      required:
-      - fields
-      - id
-      - source
-      - time
-      type: object
-    publishEventBatchByKey_request:
-      properties:
-        p_product_key:
-          description: The product's current integration key (hk_<test|live>.<product
-            UUID>.<base64url secret>). Supplied only in p_product_key; rotation invalidates
-            the old key immediately.
-          type: string
-        p_idempotency_key:
-          format: uuid
-          type: string
-        p_definition_revision:
-          format: int64
-          minimum: 0
-          type: integer
-        p_events:
+        p_metrics:
           items:
-            $ref: "#/components/schemas/publishEventBatchByKey_request_p_events_inner"
+            $ref: "#/components/schemas/Metric"
           maxItems: 100
           minItems: 1
           type: array
       required:
-      - p_definition_revision
-      - p_events
-      - p_idempotency_key
+      - p_metrics
       - p_product_key
       type: object
-    publishEventBatchByKey_200_response:
-      example:
-        accepted: 0
-        duplicates: 0
-        cursor: cursor
-        committedAt: 2000-01-23T04:56:07.000+00:00
-        dedupeUntil: 2000-01-23T04:56:07.000+00:00
-      properties:
-        accepted:
-          minimum: 0
-          type: integer
-        duplicates:
-          minimum: 0
-          type: integer
-        cursor:
-          description: Cursor encoded as a decimal string.
-          type: string
-        committedAt:
-          format: date-time
-          type: string
-        dedupeUntil:
-          format: date-time
-          type: string
-      required:
-      - accepted
-      - committedAt
-      - cursor
-      - dedupeUntil
-      - duplicates
-      type: object
-    claimCommandByKey_request:
+    deleteMetricsByKey_request:
       properties:
         p_product_key:
-          description: The product's current integration key (hk_<test|live>.<product
-            UUID>.<base64url secret>). Supplied only in p_product_key; rotation invalidates
-            the old key immediately.
+          description: The product's current integration key. Supplied only in p_product_key;
+            rotation invalidates the previous key immediately.
           type: string
-        p_worker_id:
-          maxLength: 128
-          minLength: 1
-          type: string
-        p_claim_id:
-          format: uuid
-          type: string
+        p_keys:
+          items:
+            $ref: "#/components/schemas/MetricKey"
+          maxItems: 256
+          minItems: 1
+          type: array
       required:
-      - p_claim_id
+      - p_keys
       - p_product_key
-      - p_worker_id
-      type: object
-    completeCommandByKey_request:
-      properties:
-        p_product_key:
-          description: The product's current integration key (hk_<test|live>.<product
-            UUID>.<base64url secret>). Supplied only in p_product_key; rotation invalidates
-            the old key immediately.
-          type: string
-        p_command_id:
-          format: uuid
-          type: string
-        p_lease_id:
-          format: uuid
-          type: string
-        p_status:
-          enum:
-          - succeeded
-          - failed
-          - rejected
-          type: string
-        p_result:
-          description: "Arbitrary JSON result value, including null."
-          nullable: true
-      required:
-      - p_command_id
-      - p_lease_id
-      - p_product_key
-      - p_result
-      - p_status
       type: object
   securitySchemes:
     HauloutServiceKey:
