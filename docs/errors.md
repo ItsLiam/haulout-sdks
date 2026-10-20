@@ -6,6 +6,7 @@ Failures return a JSON body with `code`, `message`, and optional `details` and `
 
 - Go: non-2xx responses return `*haulout.GenericOpenAPIError` (a pointer). Use `errors.As` with a `*haulout.GenericOpenAPIError` target, then read `Body()` (JSON text). The HTTP status is the `*http.Response` returned by `Execute()`.
 - Python: `ApiException` and its subclasses expose `.status` and `.body` (JSON text).
+- Rust: failures return `haulout::apis::Error`. HTTP errors are `Error::ResponseError(ResponseContent)`, with `.status`, the raw JSON text in `.content`, and `.entity` decoded as the operation's error enum (`DefaultResponse(PostgrestError)` for `code` and `message`). Transport and serialization failures are the other `Error` variants.
 
 | HTTP status | Go | Python |
 | --- | --- | --- |
@@ -32,13 +33,24 @@ except ApiException as exc:
     print("failed:", exc.status, exc.body)
 ```
 
+```rust
+use haulout::apis::Error;
+
+match default_api::put_metrics_by_key(&config, request).await {
+    Ok(rows) => println!("{} written", rows.len()),
+    Err(Error::ResponseError(r)) if r.status.as_u16() == 403 => eprintln!("invalid product key"),
+    Err(Error::ResponseError(r)) if r.status.as_u16() == 400 => eprintln!("invalid input: {}", r.content),
+    Err(e) => eprintln!("failed: {e}"),
+}
+```
+
 ## Codes
 
 Database errors come back as a `code` in the body. Only these are returned by the metric operations.
 
 | Code | HTTP | Operations | `message` |
 | --- | --- | --- | --- |
-| `22023` | 400 | put | `invalid metric`, `metric does not match the metric schema`, `gauge min must be less than max`, `duplicate list item id`, `table row length must match columns`, `invalid timeseries timestamp`, `metric batch must contain 1 to 100 metrics within 1 MiB`, `duplicate metric key`, `product metric limit exceeded` |
+| `22023` | 400 | put | `invalid metric`, `metric does not match the metric schema`, `gauge min must be less than max`, `duplicate list item id`, `table row length must match columns`, `table align length must match columns`, `invalid timeseries timestamp`, `metric batch must contain 1 to 100 metrics within 1 MiB`, `duplicate metric key`, `product metric limit exceeded` |
 | `22023` | 400 | delete | `metric keys must contain 1 to 256 valid keys` |
 | `28000` | 403 | put, delete | `invalid product key` |
 

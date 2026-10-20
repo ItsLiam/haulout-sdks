@@ -1,0 +1,24 @@
+[package]
+name = "haulout"
+version = "0.1.0"
+authors = ["Liam Bertoldi"]
+description = "Product integration API for Haulout product integrations. The product integration key is supplied as p_product_key in each RPC body. The apikey header uses Haulout's public service key; it is not the product key. Notification RPCs also authenticate with p_product_key."
+# Override this license by providing a License Object in the OpenAPI.
+license = "MIT"
+edition = "2021"
+repository = "https://github.com/ItsLiam/haulout-sdks"
+homepage = "https://github.com/ItsLiam/haulout-sdks"
+
+[dependencies]
+serde = { version = "^1.0", features = ["derive"] }
+serde_with = { version = "^3.8", default-features = false, features = ["base64", "std", "macros"] }
+serde_json = "^1.0"
+serde_repr = "^0.1"
+url = "^2.5"
+chrono = { version = "^0.4",  features = ["serde"] }
+reqwest = { version = "^0.13", default-features = false, features = ["json", "multipart", "query", "form"] }
+
+[features]
+default = ["native-tls"]
+native-tls = ["reqwest/native-tls"]
+rustls = ["reqwest/rustls"]

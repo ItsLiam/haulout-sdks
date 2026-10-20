@@ -10,8 +10,13 @@ docs/DeletedMetric.md
 docs/Metric.md
 docs/MetricFormat.md
 docs/MetricWriteResult.md
+docs/NotificationCategory.md
+docs/NotificationCategoryResult.md
+docs/NotificationSendResult.md
 docs/PostgrestError.md
 docs/PutMetricsByKeyRequest.md
+docs/PutNotificationCategoriesByKeyRequest.md
+docs/SendNotificationByKeyRequest.md
 go.mod
 go.sum
 model_delete_metrics_by_key_request.go
@@ -19,7 +24,12 @@ model_deleted_metric.go
 model_metric.go
 model_metric_format.go
 model_metric_write_result.go
+model_notification_category.go
+model_notification_category_result.go
+model_notification_send_result.go
 model_postgrest_error.go
 model_put_metrics_by_key_request.go
+model_put_notification_categories_by_key_request.go
+model_send_notification_by_key_request.go
 response.go
 utils.go

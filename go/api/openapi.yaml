@@ -2,9 +2,10 @@ openapi: 3.0.3
 info:
   description: Product integration API for Haulout product integrations. The product
     integration key is supplied as p_product_key in each RPC body. The apikey header
-    uses Haulout's public service key; it is not the product key.
+    uses Haulout's public service key; it is not the product key. Notification RPCs
+    also authenticate with p_product_key.
   title: Haulout Provider RPC API
-  version: 2.0.0
+  version: 2.1.0
 servers:
 - url: https://qszqptdtmkppelqligvb.supabase.co/rest/v1
 security:
@@ -71,6 +72,69 @@ paths:
           description: API error. Code 22023 means invalid or out-of-range keys. Code
             28000 means an invalid product key.
       summary: Delete current metric values
+  /rpc/put_notification_categories_by_key:
+    post:
+      description: "Replaces the product's whole notification category set with the\
+        \ supplied categories (0–64). Categories omitted from the batch are deleted,\
+        \ and their device subscriptions are removed with them. Keys already present\
+        \ update their label and description in place. An empty array clears every\
+        \ category."
+      operationId: putNotificationCategoriesByKey
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/putNotificationCategoriesByKey_request"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: "#/components/schemas/NotificationCategoryResult"
+                type: array
+          description: "One row per supplied category, in input order."
+        default:
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PostgrestError"
+          description: "API error. Code 22023 means an invalid, duplicate, or over-limit\
+            \ category batch. Code 28000 means an invalid product key."
+      summary: Replace notification categories
+  /rpc/send_notification_by_key:
+    post:
+      description: "Pushes a title and optional body to every device subscribed to\
+        \ the category. Nothing is stored; the payload exists only for dispatch. The\
+        \ recipients count is the number of subscribed devices whose sessions are\
+        \ currently live, so 0 means nobody is subscribed."
+      operationId: sendNotificationByKey
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/sendNotificationByKey_request"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: "#/components/schemas/NotificationSendResult"
+                maxItems: 1
+                minItems: 1
+                type: array
+          description: Exactly one row with the count of targeted devices.
+        default:
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PostgrestError"
+          description: "API error. Code 22023 means an invalid or unknown category,\
+            \ title, or body. Code 28000 means an invalid product key."
+      summary: Send a notification to subscribed devices
 components:
   schemas:
     ProductKey:
@@ -90,7 +154,8 @@ components:
         \ {series: [{label, color?, points: [{t, v}]}]}, 1–8 series of up to 2000\
         \ points each; t is an RFC 3339 timestamp and v is a number or null (a gap);\
         \ bar: {bars: [{label, value, color?}]}, 1–100 bars; table: {columns: [label],\
-        \ rows: [[scalar]]}, 1–16 columns and up to 500 rows."
+        \ align?: [left|center|right], rows: [[scalar]]}, 1–16 columns and up to 500\
+        \ rows; align, when present, has one entry per column (default left)."
       properties:
         key:
           description: "Metric identifier, unique within a product."
@@ -179,6 +244,49 @@ components:
       required:
       - key
       type: object
+    NotificationCategoryKey:
+      description: "Notification category identifier, unique within a product."
+      pattern: "^[a-z][a-z0-9_.-]{0,63}$"
+      type: string
+    NotificationCategory:
+      properties:
+        key:
+          description: "Notification category identifier, unique within a product."
+          pattern: "^[a-z][a-z0-9_.-]{0,63}$"
+          type: string
+        label:
+          maxLength: 100
+          minLength: 1
+          type: string
+        description:
+          maxLength: 280
+          minLength: 1
+          type: string
+      required:
+      - key
+      - label
+      type: object
+    NotificationCategoryResult:
+      example:
+        key: key
+      properties:
+        key:
+          description: "Notification category identifier, unique within a product."
+          pattern: "^[a-z][a-z0-9_.-]{0,63}$"
+          type: string
+      required:
+      - key
+      type: object
+    NotificationSendResult:
+      example:
+        recipients: 0
+      properties:
+        recipients:
+          minimum: 0
+          type: integer
+      required:
+      - recipients
+      type: object
     PostgrestError:
       description: API JSON error body; the error code is in code and text in message.
       example:
@@ -232,6 +340,45 @@ components:
       required:
       - p_keys
       - p_product_key
+      type: object
+    putNotificationCategoriesByKey_request:
+      properties:
+        p_product_key:
+          description: The product's current integration key. Supplied only in p_product_key;
+            rotation invalidates the previous key immediately.
+          type: string
+        p_categories:
+          items:
+            $ref: "#/components/schemas/NotificationCategory"
+          maxItems: 64
+          type: array
+      required:
+      - p_categories
+      - p_product_key
+      type: object
+    sendNotificationByKey_request:
+      properties:
+        p_product_key:
+          description: The product's current integration key. Supplied only in p_product_key;
+            rotation invalidates the previous key immediately.
+          type: string
+        p_category:
+          description: "Notification category identifier, unique within a product."
+          pattern: "^[a-z][a-z0-9_.-]{0,63}$"
+          type: string
+        p_title:
+          maxLength: 100
+          minLength: 1
+          type: string
+        p_body:
+          description: May be an empty string.
+          maxLength: 500
+          type: string
+      required:
+      - p_body
+      - p_category
+      - p_product_key
+      - p_title
       type: object
   securitySchemes:
     HauloutServiceKey:

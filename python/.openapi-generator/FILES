@@ -12,8 +12,13 @@ haulout/models/deleted_metric.py
 haulout/models/metric.py
 haulout/models/metric_format.py
 haulout/models/metric_write_result.py
+haulout/models/notification_category.py
+haulout/models/notification_category_result.py
+haulout/models/notification_send_result.py
 haulout/models/postgrest_error.py
 haulout/models/put_metrics_by_key_request.py
+haulout/models/put_notification_categories_by_key_request.py
+haulout/models/send_notification_by_key_request.py
 haulout/py.typed
 haulout/rest.py
 pyproject.toml

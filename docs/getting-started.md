@@ -18,6 +18,7 @@ The flow:
 
 - Go 1.23+: `go get github.com/ItsLiam/haulout-sdks/go`
 - Python 3.10+: `pip install "git+https://github.com/ItsLiam/haulout-sdks.git#subdirectory=python"`
+- Rust (edition 2021, needs an async runtime such as tokio): `cargo add haulout --git https://github.com/ItsLiam/haulout-sdks`
 
 The packages are not published to a registry yet; install from Git as shown.
 
@@ -70,6 +71,31 @@ rows = api.put_metrics_by_key(
     )
 )
 print(rows[0].key, rows[0].revision)
+```
+
+Rust (async; `serde_json` and `tokio` are your dependencies):
+
+```rust
+use haulout::apis::{configuration::Configuration, default_api};
+use haulout::models::{self, metric::Kind};
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let config = Configuration::new();
+    let mut metric = models::Metric::new(
+        "facility.status".into(),
+        Kind::Status,
+        Some(serde_json::json!({"state": "positive", "text": "Online"})),
+    );
+    metric.label = Some("Online".into());
+    let request = models::PutMetricsByKeyRequest::new(
+        std::env::var("HAULOUT_PRODUCT_KEY")?,
+        vec![metric],
+    );
+    let rows = default_api::put_metrics_by_key(&config, request).await?;
+    println!("{} {}", rows[0].key, rows[0].revision);
+    Ok(())
+}
 ```
 
 Success returns one row per metric: `key`, `revision`, and `updated_at`. See [`metrics.md`](metrics.md) for every kind and its value shape.
@@ -223,6 +249,60 @@ except ApiException as exc:
     print("delete failed:", exc.status, exc.body, file=sys.stderr)
 ```
 
+Rust (`tokio` with the `full` feature, plus `serde_json`):
+
+```rust
+use std::time::Duration;
+
+use haulout::apis::{configuration::Configuration, default_api, Error};
+use haulout::models::{self, metric::Kind, metric_format::Style};
+
+const KEY: &str = "facility.temperature";
+
+fn read_temperature() -> f64 {
+    21.4 // replace with your sensor read
+}
+
+#[tokio::main]
+async fn main() {
+    let product_key = std::env::var("HAULOUT_PRODUCT_KEY").expect("HAULOUT_PRODUCT_KEY is not set");
+    let config = Configuration::new();
+    let mut ticker = tokio::time::interval(Duration::from_secs(30));
+    let shutdown = tokio::signal::ctrl_c();
+    tokio::pin!(shutdown);
+
+    loop {
+        tokio::select! {
+            _ = &mut shutdown => break,
+            _ = ticker.tick() => {
+                let mut metric = models::Metric::new(
+                    KEY.into(), Kind::Number, Some(serde_json::json!(read_temperature())),
+                );
+                metric.label = Some("Temperature".into());
+                let mut format = models::MetricFormat::new(Style::Temperature);
+                format.unit = Some("°C".into());
+                format.precision = Some(1);
+                metric.format = Some(Box::new(format));
+                let request = models::PutMetricsByKeyRequest::new(product_key.clone(), vec![metric]);
+                match default_api::put_metrics_by_key(&config, request).await {
+                    Ok(_) => {}
+                    Err(Error::ResponseError(r)) if matches!(r.status.as_u16(), 400 | 403) => {
+                        eprintln!("permanent error, fix configuration: {}", r.content);
+                        std::process::exit(1);
+                    }
+                    Err(e) => eprintln!("put failed, retrying next tick: {e}"),
+                }
+            }
+        }
+    }
+
+    let request = models::DeleteMetricsByKeyRequest::new(product_key, vec![KEY.into()]);
+    if let Err(e) = default_api::delete_metrics_by_key(&config, request).await {
+        eprintln!("delete failed: {e}");
+    }
+}
+```
+
 Status codes: `400` (invalid input) and `403` (invalid product key) are permanent; fix the input or key rather than retrying. Other failures are safe to retry. See [`errors.md`](errors.md).
 
 ## Raw HTTP
@@ -241,7 +321,9 @@ Content-Type: application/json
 - The product key goes only in the body, as `p_product_key`.
 - Delete is `POST /rpc/delete_metrics_by_key` with `p_product_key` and `p_keys`.
 
-## The two methods
+## The methods
 
 - `PutMetricsByKey` / `put_metrics_by_key`: write 1–100 metrics per call.
 - `DeleteMetricsByKey` / `delete_metrics_by_key`: remove 1–256 keys per call.
+- `PutNotificationCategoriesByKey` / `put_notification_categories_by_key`: replace the product's notification categories (0–64); omitted categories and their device subscriptions are deleted.
+- `SendNotificationByKey` / `send_notification_by_key`: send a title and body to one category; `recipients` is the number of subscribed devices targeted.

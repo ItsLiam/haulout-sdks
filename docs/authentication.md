@@ -26,6 +26,12 @@ request = PutMetricsByKeyRequest(
 )
 ```
 
+Rust (key is the first argument of `new`):
+
+```rust
+let request = models::PutMetricsByKeyRequest::new(std::env::var("HAULOUT_PRODUCT_KEY")?, metrics);
+```
+
 ## Handling
 
 - Load the product key from the environment (`HAULOUT_PRODUCT_KEY`); never commit it to source control.

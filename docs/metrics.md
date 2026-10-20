@@ -1,6 +1,6 @@
 # Metrics
 
-A product publishes metrics: named values, each keyed by `key` within the product. The SDK has two operations.
+A product publishes metrics: named values, each keyed by `key` within the product. The SDK exposes four RPCs; the two metric operations are:
 
 - `put_metrics_by_key` (`PutMetricsByKey` in Go) writes 1–100 metrics per call.
 - `delete_metrics_by_key` (`DeleteMetricsByKey` in Go) removes 1–256 keys per call.
@@ -45,7 +45,7 @@ Unknown format fields are rejected. Use `"percent"` only for fractions (0.42 sho
 | `list` | `{"items": [{"id", "label", "detail"?, "done"?, "progress"?, "state"?}]}`, up to 500 items; `id` 1–128 characters, unique in the list; `label` 1–256; `detail` up to 1024 |
 | `timeseries` | `{"series": [{"label", "color"?, "points": [{"t", "v"}]}]}`, 1–8 series of up to 2000 points each |
 | `bar` | `{"bars": [{"label", "value", "color"?}]}`, 1–100 bars |
-| `table` | `{"columns": ["..."], "rows": [[scalar, ...]]}`, 1–16 columns and up to 500 rows; every row has one cell per column |
+| `table` | `{"columns": ["..."], "align"?: ["left"\|"center"\|"right", ...], "rows": [[scalar, ...]]}`, 1–16 columns and up to 500 rows; every row has one cell per column; `align`, when present, has one entry per column (default left) |
 
 Shared rules:
 
@@ -122,6 +122,31 @@ request = PutMetricsByKeyRequest(
 )
 rows = api.put_metrics_by_key(put_metrics_by_key_request=request)
 print(rows[0].key, rows[0].revision)
+```
+
+Rust (async; `serde_json` and `tokio` are your dependencies):
+
+```rust
+use haulout::apis::{configuration::Configuration, default_api};
+use haulout::models::{self, metric::Kind, metric_format::Style};
+
+let config = Configuration::new();
+let mut format = models::MetricFormat::new(Style::Temperature);
+format.unit = Some("°C".into());
+format.precision = Some(1);
+let mut metric = models::Metric::new(
+    "facility.temperature".into(),
+    Kind::Number,
+    Some(serde_json::json!(21.4)),
+);
+metric.label = Some("Temperature".into());
+metric.format = Some(Box::new(format));
+let request = models::PutMetricsByKeyRequest::new(
+    std::env::var("HAULOUT_PRODUCT_KEY")?,
+    vec![metric],
+);
+let rows = default_api::put_metrics_by_key(&config, request).await?;
+println!("{} {}", rows[0].key, rows[0].revision);
 ```
 
 ## Example: timeseries with a gap
