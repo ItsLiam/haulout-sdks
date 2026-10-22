@@ -4,6 +4,9 @@ api/openapi.yaml
 api_default.go
 client.go
 configuration.go
+docs/AddAnnotationsByKeyRequest.md
+docs/Annotation.md
+docs/AnnotationAddResult.md
 docs/DefaultAPI.md
 docs/DeleteMetricsByKeyRequest.md
 docs/DeletedMetric.md
@@ -19,6 +22,9 @@ docs/PutNotificationCategoriesByKeyRequest.md
 docs/SendNotificationByKeyRequest.md
 go.mod
 go.sum
+model_add_annotations_by_key_request.go
+model_annotation.go
+model_annotation_add_result.go
 model_delete_metrics_by_key_request.go
 model_deleted_metric.go
 model_metric.go
