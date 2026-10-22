@@ -1,0 +1,64 @@
+name: PC monitoring demo
+
+on:
+  push:
+    branches: [main]
+    tags: ['pc-monitoring-v*']
+    paths:
+      - demos/pc-monitoring/**
+      - rust/**
+      - .github/workflows/pc-monitoring.yml
+  pull_request:
+    paths:
+      - demos/pc-monitoring/**
+      - rust/**
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: macos-latest, target: aarch64-apple-darwin, name: macos-arm64 }
+          - { os: windows-latest, target: x86_64-pc-windows-msvc, name: windows-x64 }
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: demos/pc-monitoring
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: demos/pc-monitoring
+      - run: cargo build --release --locked --target ${{ matrix.target }}
+      # --dry-run needs no key and publishes nothing: proves the binary starts and samples.
+      - run: cargo run --release --locked --target ${{ matrix.target }} -- --dry-run
+      - name: Package
+        shell: bash
+        run: |
+          ext=""; [ "${{ runner.os }}" = Windows ] && ext=".exe"
+          mkdir dist
+          cp "target/${{ matrix.target }}/release/haulout-pc-monitoring$ext" "dist/haulout-pc-monitoring-${{ matrix.name }}$ext"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: haulout-pc-monitoring-${{ matrix.name }}
+          path: demos/pc-monitoring/dist/*
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/pc-monitoring-v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
