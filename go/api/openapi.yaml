@@ -135,6 +135,39 @@ paths:
           description: "API error. Code 22023 means an invalid or unknown category,\
             \ title, or body. Code 28000 means an invalid product key."
       summary: Send a notification to subscribed devices
+  /rpc/add_annotations_by_key:
+    post:
+      description: "Appends 1 to 100 annotations. Each is a labelled point in time\
+        \ on a channel, which dashboard timeseries charts can show as markers. Duplicates\
+        \ of an existing channel, t, and label are ignored, so retries are safe. Each\
+        \ product keeps only its newest 1000 annotations by t; older ones are deleted\
+        \ on insert."
+      operationId: addAnnotationsByKey
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/addAnnotationsByKey_request"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: "#/components/schemas/AnnotationAddResult"
+                maxItems: 1
+                minItems: 1
+                type: array
+          description: Exactly one row with the count of newly inserted annotations.
+        default:
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PostgrestError"
+          description: "API error. Code 22023 means an invalid annotation, timestamp,\
+            \ or batch size. Code 28000 means an invalid product key."
+      summary: Append timecoded annotations
 components:
   schemas:
     ProductKey:
@@ -287,6 +320,42 @@ components:
       required:
       - recipients
       type: object
+    AnnotationChannel:
+      pattern: "^[a-z][a-z0-9_.-]{0,63}$"
+      type: string
+    Annotation:
+      properties:
+        channel:
+          pattern: "^[a-z][a-z0-9_.-]{0,63}$"
+          type: string
+        t:
+          description: RFC 3339 timestamp with Z or offset
+          pattern: "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?(Z|[+-]\\\
+            d{2}:\\d{2})$"
+          type: string
+        label:
+          maxLength: 100
+          minLength: 1
+          type: string
+        color:
+          nullable: true
+          pattern: "^#[0-9a-fA-F]{6}$"
+          type: string
+      required:
+      - channel
+      - label
+      - t
+      type: object
+    AnnotationAddResult:
+      example:
+        added: 0
+      properties:
+        added:
+          minimum: 0
+          type: integer
+      required:
+      - added
+      type: object
     PostgrestError:
       description: API JSON error body; the error code is in code and text in message.
       example:
@@ -379,6 +448,22 @@ components:
       - p_category
       - p_product_key
       - p_title
+      type: object
+    addAnnotationsByKey_request:
+      properties:
+        p_product_key:
+          description: The product's current integration key. Supplied only in p_product_key;
+            rotation invalidates the previous key immediately.
+          type: string
+        p_annotations:
+          items:
+            $ref: "#/components/schemas/Annotation"
+          maxItems: 100
+          minItems: 1
+          type: array
+      required:
+      - p_annotations
+      - p_product_key
       type: object
   securitySchemes:
     HauloutServiceKey:

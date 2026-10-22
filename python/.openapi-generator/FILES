@@ -7,6 +7,9 @@ haulout/api_response.py
 haulout/configuration.py
 haulout/exceptions.py
 haulout/models/__init__.py
+haulout/models/add_annotations_by_key_request.py
+haulout/models/annotation.py
+haulout/models/annotation_add_result.py
 haulout/models/delete_metrics_by_key_request.py
 haulout/models/deleted_metric.py
 haulout/models/metric.py
