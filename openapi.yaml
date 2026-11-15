@@ -188,6 +188,50 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PostgrestError'
+  /rpc/add_annotations_by_key:
+    post:
+      operationId: addAnnotationsByKey
+      summary: Append timecoded annotations
+      description: >-
+        Appends 1 to 100 annotations. Each is a labelled point in time on a channel,
+        which dashboard timeseries charts can show as markers. Duplicates of an
+        existing channel, t, and label are ignored, so retries are safe. Each product
+        keeps only its newest 1000 annotations by t; older ones are deleted on insert.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [p_product_key, p_annotations]
+              properties:
+                p_product_key:
+                  $ref: '#/components/schemas/ProductKey'
+                p_annotations:
+                  type: array
+                  minItems: 1
+                  maxItems: 100
+                  items:
+                    $ref: '#/components/schemas/Annotation'
+      responses:
+        '200':
+          description: Exactly one row with the count of newly inserted annotations.
+          content:
+            application/json:
+              schema:
+                type: array
+                minItems: 1
+                maxItems: 1
+                items:
+                  $ref: '#/components/schemas/AnnotationAddResult'
+        default:
+          description: >-
+            API error. Code 22023 means an invalid annotation, timestamp, or batch size.
+            Code 28000 means an invalid product key.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PostgrestError'
 components:
   securitySchemes:
     HauloutServiceKey:
@@ -298,6 +342,34 @@ components:
       required: [recipients]
       properties:
         recipients:
+          type: integer
+          minimum: 0
+    AnnotationChannel:
+      type: string
+      pattern: '^[a-z][a-z0-9_.-]{0,63}$'
+    Annotation:
+      type: object
+      required: [channel, t, label]
+      properties:
+        channel:
+          $ref: '#/components/schemas/AnnotationChannel'
+        t:
+          type: string
+          description: RFC 3339 timestamp with Z or offset
+          pattern: '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$'
+        label:
+          type: string
+          minLength: 1
+          maxLength: 100
+        color:
+          type: string
+          pattern: '^#[0-9a-fA-F]{6}$'
+          nullable: true
+    AnnotationAddResult:
+      type: object
+      required: [added]
+      properties:
+        added:
           type: integer
           minimum: 0
     PostgrestError:

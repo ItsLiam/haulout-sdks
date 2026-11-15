@@ -28,6 +28,9 @@ __all__ = [
     "ApiKeyError",
     "ApiAttributeError",
     "ApiException",
+    "AddAnnotationsByKeyRequest",
+    "Annotation",
+    "AnnotationAddResult",
     "DeleteMetricsByKeyRequest",
     "DeletedMetric",
     "Metric",
@@ -57,6 +60,9 @@ from haulout.exceptions import ApiAttributeError as ApiAttributeError
 from haulout.exceptions import ApiException as ApiException
 
 # import models into sdk package
+from haulout.models.add_annotations_by_key_request import AddAnnotationsByKeyRequest as AddAnnotationsByKeyRequest
+from haulout.models.annotation import Annotation as Annotation
+from haulout.models.annotation_add_result import AnnotationAddResult as AnnotationAddResult
 from haulout.models.delete_metrics_by_key_request import DeleteMetricsByKeyRequest as DeleteMetricsByKeyRequest
 from haulout.models.deleted_metric import DeletedMetric as DeletedMetric
 from haulout.models.metric import Metric as Metric
