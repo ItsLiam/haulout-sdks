@@ -5,7 +5,6 @@ description = "Haulout Provider RPC API"
 authors = [
   {name = "OpenAPI Generator Community",email = "team@openapitools.org"},
 ]
-dynamic = ["readme"]
 keywords = ["OpenAPI", "OpenAPI-Generator", "Haulout Provider RPC API"]
 requires-python = ">=3.10"
 

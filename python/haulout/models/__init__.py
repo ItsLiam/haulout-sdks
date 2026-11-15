@@ -13,6 +13,9 @@
 """  # noqa: E501
 
 # import models into model package
+from haulout.models.add_annotations_by_key_request import AddAnnotationsByKeyRequest
+from haulout.models.annotation import Annotation
+from haulout.models.annotation_add_result import AnnotationAddResult
 from haulout.models.delete_metrics_by_key_request import DeleteMetricsByKeyRequest
 from haulout.models.deleted_metric import DeletedMetric
 from haulout.models.metric import Metric
